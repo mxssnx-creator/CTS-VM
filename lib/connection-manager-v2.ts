@@ -253,10 +253,6 @@ export class ConnectionManagerV2 {
   }
 }
 
-  is_active?: boolean
-  volume_factor?: number
-}
-
 export interface ConnectionValidationResult {
   isValid: boolean
   errors: string[]

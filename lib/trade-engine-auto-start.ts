@@ -102,91 +102,12 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
 
 /**
  * Monitor for connection changes and auto-start new engines
+ * DISABLED: Continuous monitoring removed - connections only assigned on startup
  */
 function startConnectionMonitoring(): void {
-  let lastEnabledCount = 0
-  let cachedSettings: any = null
-  let settingsCacheTime = 0
-  const SETTINGS_CACHE_TTL = 60000 // 60 seconds
-
-  autoStartTimer = setInterval(async () => {
-    try {
-      // Always check global engine status first
-      await initRedis()
-      const monClient = getRedisClient()
-      const monGlobalState = await monClient.hgetall("trade_engine:global")
-      if (monGlobalState?.status !== "running") {
-        // Global engine not running - don't auto-start any connections
-        return
-      }
-      
-      const connections = await getAllConnections()
-
-      // Ensure connections is an array before filtering
-      if (!Array.isArray(connections)) {
-        console.warn("[v0] [Monitor] Connections not array")
-        return
-      }
-
-      // Filter for ACTIVE-INSERTED connections with valid API keys only
-      // These are connections the user has added to the Active panel
-      const enabledConnections = connections.filter((c) => {
-        const isActiveInserted = c.is_active_inserted === true || c.is_active_inserted === "true" || c.is_active_inserted === "1"
-        const hasValidKey = c.api_key && c.api_key.length >= 20 && !c.api_key.includes("PLACEHOLDER")
-        return isActiveInserted && hasValidKey
-      })
-
-      // If enabled connection count changed, log it
-      if (enabledConnections.length !== lastEnabledCount) {
-        console.log(`[v0] [Monitor] Enabled connections changed: ${lastEnabledCount} -> ${enabledConnections.length}`)
-        lastEnabledCount = enabledConnections.length
-      }
-
-      // Load settings ONCE per interval, not per connection
-      let settings = cachedSettings
-      if (!settings || Date.now() - settingsCacheTime > SETTINGS_CACHE_TTL) {
-        settings = await loadSettingsAsync()
-        cachedSettings = settings
-        settingsCacheTime = Date.now()
-      }
-
-      const coordinator = getGlobalTradeEngineCoordinator()
-
-      for (const connection of enabledConnections) {
-        try {
-          // Check if engine is already running for this connection
-          const engineStatus = coordinator.getEngineStatus(connection.id)
-
-          if (!engineStatus || engineStatus.status === "stopped") {
-            console.log(`[v0] [Monitor] Auto-starting trade engine for: ${connection.name}`)
-
-            if (connection.api_key && connection.api_secret) {
-              await coordinator.startEngine(connection.id, {
-                connectionId: connection.id,
-                indicationInterval: settings.mainEngineIntervalMs ? settings.mainEngineIntervalMs / 1000 : 1,
-                strategyInterval: settings.strategyUpdateIntervalMs ? settings.strategyUpdateIntervalMs / 1000 : 1,
-                realtimeInterval: settings.realtimeIntervalMs ? settings.realtimeIntervalMs / 1000 : 0.2,
-              })
-
-              console.log(`[v0] [Monitor] ✓ Trade engine auto-started: ${connection.name}`)
-            }
-          }
-        } catch (error) {
-          console.warn(`[v0] [Monitor] Failed to auto-start ${connection.name}:`, error)
-        }
-      }
-    } catch (error) {
-      // Log but don't crash - gracefully handle Redis errors
-      if (error instanceof Error && error.message.includes("Redis credentials")) {
-        // Only log once per interval to avoid spam
-        if (Math.random() < 0.1) {
-          console.warn("[v0] [Monitor] Redis not configured - skipping auto-start check")
-        }
-      } else {
-        console.warn("[v0] [Monitor] Error during connection monitoring:", error instanceof Error ? error.message : String(error))
-      }
-    }
-  }, 10000) // Check every 10 seconds for new enabled connections
+  console.log("[v0] [Monitor] Connection monitoring DISABLED - connections only assigned on startup")
+  // No longer running continuous monitoring - connections are only processed during startup
+  // This prevents intervaled reassignments and ensures connections are only managed on startup
 }
 
 /**

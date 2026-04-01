@@ -110,8 +110,10 @@ export default function MainStrategySettings({
                 position simultaneously, providing controlled risk management.
               </p>
             </div>
-          </div>
+            </div>
+          </CardContent>
 
+          <CardContent>
             <div className="grid gap-4">
               <div className="flex items-center justify-between p-3 border rounded-lg bg-card">
                 <div>
@@ -152,26 +154,25 @@ export default function MainStrategySettings({
                 />
               </div>
             </div>
-          </div>
 
-          <div className="p-4 bg-muted rounded-lg space-y-3">
-            <h4 className="text-sm font-semibold">Main Strategy Overview</h4>
-            <div className="space-y-2 text-xs text-muted-foreground">
-              <p>
-                The Main Strategy builds upon Base positions to create actively managed trading positions. It analyzes
-                recent performance and market conditions to determine optimal entry and exit points.
-              </p>
-              <p>
-                Previous positions analysis helps identify successful patterns, while last state count determines how
-                much recent history influences decisions.
-              </p>
-              <p>
-                Ongoing trailing protects profits on active positions. Block and DCA adjustments provide additional
-                flexibility for different market conditions.
-              </p>
+            <div className="p-4 bg-muted rounded-lg space-y-3">
+              <h4 className="text-sm font-semibold">Main Strategy Overview</h4>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <p>
+                  The Main Strategy builds upon Base positions to create actively managed trading positions. It analyzes
+                  recent performance and market conditions to determine optimal entry and exit points.
+                </p>
+                <p>
+                  Previous positions analysis helps identify successful patterns, while last state count determines how
+                  much recent history influences decisions.
+                </p>
+                <p>
+                  Ongoing trailing protects profits on active positions. Block and DCA adjustments provide additional
+                  flexibility for different market conditions.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
       </Card>
     </div>
   )
