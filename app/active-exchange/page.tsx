@@ -23,7 +23,7 @@ export default function ActiveExchangePage() {
         
         // Filter to only dashboard-active connections
         const active = (data.connections || []).filter(
-          (c: any) => c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === "true"
+          (c: any) => c.is_main_enabled === true || c.is_main_enabled === "1" || c.is_main_enabled === "true"
         )
         
         setActiveConnections(active)

@@ -15,14 +15,14 @@ export async function GET() {
     await initRedis()
     const allConnections = await getAllConnections()
     
-    // Check if ANY connections have is_enabled_dashboard = true/"1"
+    // Check if ANY connections have is_main_enabled = true/"1"
     const activeConnections = allConnections.filter((c: any) => {
-      const d = c.is_enabled_dashboard
+      const d = c.is_main_enabled
       return d === true || d === "1" || d === "true"
     })
     
     const dashboardInsertedConnections = allConnections.filter((c: any) => {
-      const d = c.is_dashboard_inserted
+      const d = c.is_main_assigned
       return d === "1" || d === true
     })
     
@@ -46,22 +46,22 @@ export async function GET() {
           name: c.name,
           exchange: c.exchange,
           is_enabled: c.is_enabled,
-          is_dashboard_inserted: c.is_dashboard_inserted,
-          is_enabled_dashboard: c.is_enabled_dashboard,
+          is_main_assigned: c.is_main_assigned,
+          is_main_enabled: c.is_main_enabled,
           is_live_trade: c.is_live_trade,
         })),
       },
       diagnosis: {
         noActiveConnections: activeConnections.length === 0,
         reason: activeConnections.length === 0 
-          ? "No connections have is_enabled_dashboard=true. Trade engine needs at least one active connection."
+          ? "No connections have is_main_enabled=true. Trade engine needs at least one active connection."
           : "Trade engine should be able to start.",
         nextSteps: activeConnections.length === 0
           ? [
               "1. Ensure Global Trade Engine is running: POST /api/trade-engine/start",
               "2. Enable at least one connection on the dashboard (bybit or bingx)",
               "3. Toggle the connection's Enable switch in the UI",
-              "4. This will set is_enabled_dashboard='1' for the connection",
+              "4. This will set is_main_enabled='1' for the connection",
               "5. Trade engine will automatically pick it up and start processing"
             ]
           : ["Trade engine should start. Check logs for detailed progression."],

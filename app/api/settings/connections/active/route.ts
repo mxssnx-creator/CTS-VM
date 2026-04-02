@@ -8,7 +8,7 @@ export async function GET() {
     
     // Active connections = ONLY connections marked as enabled on dashboard
     const activeConnections = allConnections.filter((c: any) => {
-      const isDashboardEnabled = c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true || c.is_enabled_dashboard === 1
+      const isDashboardEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true || c.is_main_enabled === 1
       return isDashboardEnabled
     })
     

@@ -22,7 +22,7 @@ export interface ConnectionV2 {
   position_mode: "one_way" | "hedge"
   is_testnet: boolean
   is_enabled: boolean
-  is_enabled_dashboard: string
+  is_main_enabled: string
   is_live_trade: string
   is_preset_trade: string
   is_predefined: boolean
@@ -128,7 +128,7 @@ export class ConnectionManagerV2 {
     try {
       await this.initialize()
       const conn: ConnectionV2 = {
-        id: input.id || `${input.exchange}-${Date.now()}`,
+        id: `${input.exchange}-${Date.now()}`,
         name: input.name,
         exchange: input.exchange,
         api_type: input.api_type || "perpetual_futures",
@@ -141,8 +141,8 @@ export class ConnectionManagerV2 {
         margin_type: input.margin_type || "cross",
         position_mode: input.position_mode || "hedge",
         is_testnet: input.is_testnet || false,
-        is_enabled: input.is_enabled || false,
-        is_enabled_dashboard: "0",
+        is_enabled: false,
+        is_main_enabled: "0",
         is_live_trade: "0",
         is_preset_trade: "0",
         is_predefined: false,
@@ -151,7 +151,7 @@ export class ConnectionManagerV2 {
         updated_at: new Date().toISOString(),
       }
 
-      await createConnection(conn.id, conn)
+      await createConnection(conn)
       await SystemLogger.logConnection(`Connection created: ${conn.name}`, conn.id, "info")
       return conn
     } catch (error) {
@@ -215,13 +215,13 @@ export class ConnectionManagerV2 {
   }
 
   /**
-   * Get active dashboard connections
+   * Get active main connections
    */
   async getActiveConnections(): Promise<ConnectionV2[]> {
     try {
       await this.initialize()
       const all = await this.getAllConnections()
-      return all.filter(c => c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true) as ConnectionV2[]
+      return all.filter(c => c.is_main_enabled === "1" || c.is_main_enabled === true) as ConnectionV2[]
     } catch (error) {
       console.error("[v0] Failed to get active connections:", error)
       return []

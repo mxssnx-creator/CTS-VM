@@ -28,9 +28,9 @@ export function ExchangeProvider({ children }: { children: ReactNode }) {
     loadingRef.current = true
     setIsLoading(true)
     try {
-      console.log("[v0] [Exchange Context] Loading dashboard active connections for exchange selector...")
-      // Load ONLY connections that are added to active list (is_enabled_dashboard="1")
-      const response = await fetch("/api/settings/connections?dashboard=true", {
+      console.log("[v0] [Exchange Context] Loading main active connections for exchange selector...")
+      // Load ONLY connections that are added to active list (is_main_enabled="1")
+      const response = await fetch("/api/settings/connections?main=true", {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
       })
@@ -38,18 +38,18 @@ export function ExchangeProvider({ children }: { children: ReactNode }) {
         const data = await response.json()
         const connections = data.connections || []
         
-        // Filter to only show dashboard-active connections (is_enabled_dashboard=1 or true)
-        const dashboardActive = connections.filter((c: any) => {
-          const isDashboardEnabled = c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === "true"
-          return isDashboardEnabled
+        // Filter to only show main-enabled connections (is_main_enabled=1 or true)
+        const mainActive = connections.filter((c: any) => {
+          const isMainEnabled = c.is_main_enabled === true || c.is_main_enabled === "1" || c.is_main_enabled === "true"
+          return isMainEnabled
         })
         
-        setActiveConnections(dashboardActive)
-        console.log("[v0] [Exchange Context] Loaded", dashboardActive.length, "dashboard-active connections from", connections.length, "total")
+        setActiveConnections(mainActive)
+        console.log("[v0] [Exchange Context] Loaded", mainActive.length, "main-active connections from", connections.length, "total")
         
         // Auto-select first connection if none selected
-        if (!selectedExchange && dashboardActive.length > 0) {
-          setSelectedExchange(dashboardActive[0].exchange)
+        if (!selectedExchange && mainActive.length > 0) {
+          setSelectedExchange(mainActive[0].exchange)
         }
       }
     } catch (error) {

@@ -49,7 +49,7 @@ export async function GET(req: Request) {
       connection: {
         is_live_trade: (conn as any)?.is_live_trade,
         is_active: (conn as any)?.is_active,
-        is_active_inserted: (conn as any)?.is_active_inserted,
+        is_active_assigned: (conn as any)?.is_active_assigned,
       },
       debug: {
         eng_state_raw: engState,

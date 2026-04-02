@@ -9,7 +9,7 @@ import { initRedis, getConnection, updateConnection, getAllConnections } from "@
  * Action:
  * 1. Load the base connection (predefined)
  * 2. Create an "active copy" state in Redis
- * 3. Set is_enabled_dashboard=true to show in Active Connections
+ * 3. Set is_main_enabled=true to show in Active Connections
  * 4. Set is_enabled=false to require explicit enable
  * 5. Reset trade flags (is_live_trade, is_preset_trade to false)
  */
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already inserted in active list
-    if (baseConnection.is_active_inserted === "1" || baseConnection.is_active_inserted === true) {
+    if (baseConnection.is_active_assigned === "1" || baseConnection.is_active_assigned === true) {
       return NextResponse.json({
         success: false,
         error: "Connection already in Active panel",
@@ -40,11 +40,11 @@ export async function POST(request: NextRequest) {
     // Add to active list: inserted into Active panel, but NOT enabled by default
     const activeConnection = {
       ...baseConnection,
-      is_active_inserted: "1",    // Visible in Active panel (inserted)
-      is_enabled_dashboard: "0",  // Toggle is OFF (NOT enabled by default)
+      is_active_assigned: "1",    // Visible in Active panel (inserted)
+      is_main_enabled: "0",  // Toggle is OFF (NOT enabled by default)
       is_enabled: "0",            // NOT enabled - user must toggle to enable
       is_active: "0",             // Not active until user enables
-      is_inserted: "1",           // Inserted (for connection tracking)
+      is_assigned: "1",           // Inserted (for connection tracking)
       is_live_trade: "0",
       is_preset_trade: "0",
       updated_at: new Date().toISOString(),
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       `Inserted into Active panel. Toggle to enable.`,
       connectionId,
       "info",
-      { is_active_inserted: true, is_enabled_dashboard: false, is_enabled: false },
+      { is_active_assigned: true, is_main_enabled: false, is_enabled: false },
     )
 
     return NextResponse.json({

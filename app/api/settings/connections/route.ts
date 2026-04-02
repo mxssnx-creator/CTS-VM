@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     for (const c of connections) {
       const exch = (c.exchange || "").toLowerCase().trim()
       const shouldBeActive = ACTIVE_AUTO_INSERTED.includes(exch)
-      const activeInserted = c.is_active_inserted === "1" || c.is_active_inserted === true
+      const activeInserted = c.is_active_assigned === "1" || c.is_active_assigned === true
       const needsActiveSet = shouldBeActive && !activeInserted
       const needsActiveReset = !shouldBeActive && activeInserted
       
@@ -57,11 +57,11 @@ export async function GET(request: NextRequest) {
         const newValue = shouldBeActive ? "1" : "0"
         await updateConnection(c.id, {
           ...c,
-          is_active_inserted: newValue,
+          is_active_assigned: newValue,
           updated_at: new Date().toISOString(),
         })
         migratedCount++
-        console.log(`[v0] [API] [Connections] ${API_VERSION}: ${c.exchange}: is_active_inserted=${shouldBeActive ? "SET to 1" : "RESET to 0"}`)
+        console.log(`[v0] [API] [Connections] ${API_VERSION}: ${c.exchange}: is_active_assigned=${shouldBeActive ? "SET to 1" : "RESET to 0"}`)
       }
       console.log(`[v0] [API] [Connections] ${API_VERSION}: Updated ${migratedCount} connections`)
       // Reload after updates
@@ -94,11 +94,11 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Filter by is_enabled_dashboard for actively using connections (INDEPENDENT from Settings)
+    // Filter by is_main_enabled for actively using connections (INDEPENDENT from Settings)
     if (active === "true") {
       connections = connections.filter((c) => {
         // Handle both boolean and string representations
-        const isEnabledDash = c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === "true"
+        const isEnabledDash = c.is_main_enabled === true || c.is_main_enabled === "1" || c.is_main_enabled === "true"
         return isEnabledDash
       })
     }
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     const bybitBingx = connections.filter(c => ["bybit", "bingx"].includes((c.exchange || "").toLowerCase()))
     console.log(`[v0] [API] [Connections] ${API_VERSION}: Returning ${connections.length} total connections`)
     console.log(`[v0] [API] [Connections] ${API_VERSION}: Active-inserted (bybit/bingx):`, 
-      bybitBingx.map(c => ({ name: c.name, exchange: c.exchange, is_active_inserted: c.is_active_inserted })))
+      bybitBingx.map(c => ({ name: c.name, exchange: c.exchange, is_active_assigned: c.is_active_assigned })))
     
     return NextResponse.json({ success: true, count: connections.length, connections, version: API_VERSION }, { headers })
   } catch (error) {
@@ -164,10 +164,10 @@ export async function POST(request: Request) {
       position_mode: body.position_mode || "hedge",
       is_testnet: body.is_testnet || false,
       is_enabled: body.is_enabled === true, // Settings: enabled by default for base connections
-      is_inserted: true, // User-created connection is "inserted" (available for use)
-      is_dashboard_inserted: false, // Not yet added to Active Connections dashboard
-      is_active_inserted: false, // Not yet in Active panel
-      is_enabled_dashboard: false, // Dashboard toggle OFF by default
+      is_assigned: true, // User-created connection is "inserted" (available for use)
+      is_main_assigned: false, // Not yet added to Active Connections dashboard
+      is_active_assigned: false, // Not yet in Active panel
+      is_main_enabled: false, // Dashboard toggle OFF by default
       is_active: false, // Not actively processing
       is_predefined: false, // User-created, not predefined template
       is_live_trade: false,

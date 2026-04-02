@@ -22,8 +22,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       name: connection.name,
       exchange: connection.exchange,
       enabled: connection.is_enabled === "1" || connection.is_enabled === true,
-      dashboard_inserted: connection.is_dashboard_inserted === "1" || connection.is_dashboard_inserted === true,
-      dashboard_enabled: connection.is_enabled_dashboard === "1" || connection.is_enabled_dashboard === true,
+      dashboard_inserted: connection.is_main_assigned === "1" || connection.is_main_assigned === true,
+      dashboard_enabled: connection.is_main_enabled === "1" || connection.is_main_enabled === true,
       live_trade: connection.is_live_trade === "1" || connection.is_live_trade === true,
     }
 

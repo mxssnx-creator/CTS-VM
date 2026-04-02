@@ -22,21 +22,21 @@ interface ConnectionState {
   setBaseConnections: (connections: ExchangeConnection[]) => void
   loadBaseConnections: () => Promise<void>
   isBaseLoading: boolean
-  baseConnectionStatuses: Map<string, { enabled: boolean; inserted: boolean }> // independent status tracking
+  baseConnectionStatuses: Map<string, { enabled: boolean; assigned: boolean }>
   setBaseConnectionStatus: (id: string, enabled: boolean) => void
-  markBaseAsInserted: (id: string) => void
+  markBaseAsAssigned: (id: string) => void
   
-  // ExchangeConnectionsActive (enabled only) - used in Dashboard with independent status
+  // MainConnectionsActive (enabled only) - used in Main page with independent status
   exchangeConnectionsActive: ExchangeConnection[]
   setExchangeConnectionsActive: (connections: ExchangeConnection[]) => void
   loadExchangeConnectionsActive: () => Promise<void>
   isExchangeConnectionsActiveLoading: boolean
   
-  // ExchangeConnectionsActive status management - independent from settings
+  // MainConnectionsActive status management - independent from settings
   exchangeConnectionsActiveStatus: Map<string, boolean> // id -> is_active
   toggleExchangeConnectionsActiveStatus: (id: string) => void
-  markExchangeAsInserted: (id: string) => void
-  exchangeConnectionsInsertedStatus: Set<string>
+  markExchangeAsAssigned: (id: string) => void
+  exchangeConnectionsAssignedStatus: Set<string>
   
   // Trade Engine Status - independent from connection status
   tradeEngineStatuses: Map<string, TradeEngineStatus>
@@ -50,13 +50,13 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
   // Base connections state (Settings)
   const [baseConnections, setBaseConnections] = useState<ExchangeConnection[]>([])
   const [isBaseLoading, setIsBaseLoading] = useState(false)
-  const [baseConnectionStatuses, setBaseConnectionStatuses] = useState<Map<string, { enabled: boolean; inserted: boolean }>>(new Map())
+  const [baseConnectionStatuses, setBaseConnectionStatuses] = useState<Map<string, { enabled: boolean; assigned: boolean }>>(new Map())
   
-  // ExchangeConnectionsActive state (Dashboard - independent status)
+  // MainConnectionsActive state (Main page - independent status)
   const [exchangeConnectionsActive, setExchangeConnectionsActive] = useState<ExchangeConnection[]>([])
   const [isExchangeConnectionsActiveLoading, setIsExchangeConnectionsActiveLoading] = useState(false)
   const [exchangeConnectionsActiveStatus, setExchangeConnectionsActiveStatus] = useState<Map<string, boolean>>(new Map())
-  const [exchangeConnectionsInsertedStatus, setExchangeConnectionsInsertedStatus] = useState<Set<string>>(new Set())
+  const [exchangeConnectionsAssignedStatus, setExchangeConnectionsAssignedStatus] = useState<Set<string>>(new Set())
   
   // Trade Engine Status - independent from connections
   const [tradeEngineStatuses, setTradeEngineStatuses] = useState<Map<string, TradeEngineStatus>>(new Map())
@@ -64,14 +64,11 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
   // Prevent concurrent loads and excessive queries
   const loadingRef = useRef<{ base: boolean; active: boolean }>({ base: false, active: false })
   const lastLoadRef = useRef<{ base: number; active: number }>({ base: 0, active: 0 })
-  const LOAD_COOLDOWN = 5000 // 5 seconds between same-type loads (reduced from 30s for better UX)
+  const LOAD_COOLDOWN = 5000 // 5 seconds between same-type loads
 
   // Load all connections for Settings (single unified function)
   const loadBaseConnections = async () => {
-    // Prevent concurrent requests
     if (loadingRef.current.base) return
-    
-    // Prevent excessive refreshes
     if (Date.now() - lastLoadRef.current.base < LOAD_COOLDOWN) return
 
     loadingRef.current.base = true
@@ -82,34 +79,30 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
         const data = await response.json()
         setBaseConnections(data.connections || [])
         
-        // Initialize status map - only auto-inserted connections (bybit, bingx) are enabled by default
-        const AUTO_INSERTED = ["bybit", "bingx"]
-        const statusMap = new Map<string, { enabled: boolean; inserted: boolean }>()
+        // Initialize status map
+        const AUTO_ASSIGNED = ["bybit", "bingx"]
+        const statusMap = new Map<string, { enabled: boolean; assigned: boolean }>()
         data.connections?.forEach((conn: ExchangeConnection) => {
           const exchange = (conn.exchange || "").toLowerCase().trim()
-          const isAutoInserted = AUTO_INSERTED.includes(exchange)
-          const isInserted = conn.is_inserted === "1" || conn.is_inserted === true
+          const isAutoAssigned = AUTO_ASSIGNED.includes(exchange)
+          const isAssigned = (conn as any).is_assigned === "1" || (conn as any).is_assigned === true
           
           statusMap.set(conn.id, { 
-            // Auto-inserted connections start enabled; others start disabled
-            enabled: isAutoInserted && isInserted,
-            inserted: false 
+            enabled: isAutoAssigned && isAssigned,
+            assigned: false 
           })
         })
         setBaseConnectionStatuses(statusMap)
         
-        // Also update Active connections if any are marked as visible on dashboard
+        // Also update Main connections if any are marked as visible on main page
         const activeConns = data.connections?.filter((c: ExchangeConnection) => 
-          c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1"
+          (c as any).is_main_enabled === true || (c as any).is_main_enabled === "1"
         ) || []
         
         if (activeConns.length > 0) {
           setExchangeConnectionsActive(activeConns)
-          // Active connections are ALWAYS disabled by default on dashboard
-          // Their active state is independent from base connection is_enabled
           const activeStatusMap = new Map<string, boolean>()
           activeConns.forEach((conn: ExchangeConnection) => {
-            // Default to false (disabled) - user must explicitly enable via dashboard toggle
             activeStatusMap.set(conn.id, false)
           })
           setExchangeConnectionsActiveStatus(activeStatusMap)
@@ -124,14 +117,9 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Load ALL BASE connections for Active Connections list
-  // Shows the 4 primary exchanges (bybit, bingx, pionex, orangex) as connection cards
-  // The toggle controls is_enabled_dashboard (independent from Settings is_enabled)
+  // Load ALL BASE connections for Main Connections list
   const loadExchangeConnectionsActive = async () => {
-    // Prevent concurrent requests
     if (loadingRef.current.active) return
-    
-    // Prevent excessive refreshes
     if (Date.now() - lastLoadRef.current.active < LOAD_COOLDOWN) return
 
     loadingRef.current.active = true
@@ -142,29 +130,26 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
         const data = await response.json()
         const allConnections = data.connections || []
         
-        // Show ALL inserted connections (not just 4 hardcoded exchanges)
-        // Matches the same logic as DashboardActiveConnectionsManager
         const BASE_EXCHANGES = ["bybit", "bingx", "pionex", "orangex"]
         const activeConns = allConnections.filter((c: any) => {
           const exchange = (c.exchange || "").toLowerCase().trim()
           const isBase = BASE_EXCHANGES.includes(exchange)
-          const isInserted = c.is_inserted === true || c.is_inserted === "1" || c.is_inserted === "true"
-          const isDashboardActive = c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === "true"
-          return isBase || isInserted || isDashboardActive
+          const isAssigned = c.is_assigned === true || c.is_assigned === "1" || c.is_assigned === "true"
+          const isMainEnabled = c.is_main_enabled === true || c.is_main_enabled === "1" || c.is_main_enabled === "true"
+          return isBase || isAssigned || isMainEnabled
         })
         
         setExchangeConnectionsActive(activeConns)
         
-        // Initialize status map - use is_enabled_dashboard for the active toggle (independent)
         const statusMap = new Map<string, boolean>()
         activeConns.forEach((conn: ExchangeConnection) => {
-          const isDashboardEnabled = (conn as any).is_enabled_dashboard === true || (conn as any).is_enabled_dashboard === "1" || (conn as any).is_enabled_dashboard === "true"
-          statusMap.set(conn.id, isDashboardEnabled)
+          const isMainEnabled = (conn as any).is_main_enabled === true || (conn as any).is_main_enabled === "1" || (conn as any).is_main_enabled === "true"
+          statusMap.set(conn.id, isMainEnabled)
         })
         setExchangeConnectionsActiveStatus(statusMap)
       }
     } catch (error) {
-      console.error("[v0] [ConnectionState] Failed to load Active Connections:", error)
+      console.error("[v0] [ConnectionState] Failed to load Main Connections:", error)
     } finally {
       loadingRef.current.active = false
       setIsExchangeConnectionsActiveLoading(false)
@@ -172,37 +157,33 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Set base connection status (enabled/disabled)
   const setBaseConnectionStatus = (id: string, enabled: boolean) => {
     setBaseConnectionStatuses(prev => {
       const next = new Map(prev)
-      const current = next.get(id) || { enabled: false, inserted: false }
+      const current = next.get(id) || { enabled: false, assigned: false }
       next.set(id, { ...current, enabled })
       return next
     })
   }
 
-  // Mark base connection as inserted
-  const markBaseAsInserted = (id: string) => {
+  const markBaseAsAssigned = (id: string) => {
     setBaseConnectionStatuses(prev => {
       const next = new Map(prev)
-      const current = next.get(id) || { enabled: false, inserted: false }
-      next.set(id, { ...current, inserted: true })
+      const current = next.get(id) || { enabled: false, assigned: false }
+      next.set(id, { ...current, assigned: true })
       return next
     })
     
-    // Auto-clear after 5 seconds
     setTimeout(() => {
       setBaseConnectionStatuses(prev => {
         const next = new Map(prev)
-        const current = next.get(id) || { enabled: false, inserted: false }
-        next.set(id, { ...current, inserted: false })
+        const current = next.get(id) || { enabled: false, assigned: false }
+        next.set(id, { ...current, assigned: false })
         return next
       })
     }, 5000)
   }
 
-  // Toggle Active Connection status independently (NEVER affects Settings)
   const toggleExchangeConnectionsActiveStatus = (id: string) => {
     setExchangeConnectionsActiveStatus(prev => {
       const next = new Map(prev)
@@ -210,22 +191,19 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
       const newStatus = !currentStatus
       next.set(id, newStatus)
       
-      // Find the connection to log its name
       const conn = exchangeConnectionsActive.find(c => c.id === `active-${id}`) || exchangeConnectionsActive.find(c => c.id === id)
-      const connName = conn?.name || conn?.connectionId || id
-      console.log(`[v0] [ConnectionStateToggle] ${newStatus ? "✓ ENABLED" : "✗ DISABLED"}: ${connName} (${id})`)
+      const connName = conn?.name || id
+      console.log(`[v0] [ConnectionStateToggle] ${newStatus ? "ENABLED" : "DISABLED"}: ${connName} (${id})`)
       
       return next
     })
   }
 
-  // Mark exchange connection as inserted to active list
-  const markExchangeAsInserted = (id: string) => {
-    setExchangeConnectionsInsertedStatus(prev => new Set(prev).add(id))
+  const markExchangeAsAssigned = (id: string) => {
+    setExchangeConnectionsAssignedStatus(prev => new Set(prev).add(id))
     
-    // Auto-clear after 5 seconds
     setTimeout(() => {
-      setExchangeConnectionsInsertedStatus(prev => {
+      setExchangeConnectionsAssignedStatus(prev => {
         const next = new Set(prev)
         next.delete(id)
         return next
@@ -233,7 +211,6 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
     }, 5000)
   }
 
-  // Update trade engine status (independent from connection status)
   const updateTradeEngineStatus = (connectionId: string, status: TradeEngineStatus) => {
     setTradeEngineStatuses(prev => {
       const next = new Map(prev)
@@ -242,12 +219,10 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  // Get trade engine status
   const getTradeEngineStatus = (connectionId: string): TradeEngineStatus | undefined => {
     return tradeEngineStatuses.get(connectionId)
   }
 
-  // Auto-test base connections at startup and every 5 minutes
   const triggerAutoTest = async () => {
     try {
       await fetch("/api/settings/connections/auto-test", {
@@ -259,21 +234,16 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Initial load on mount
   useEffect(() => {
     loadBaseConnections()
     loadExchangeConnectionsActive()
-    
-    // Auto-test base connections at startup
     triggerAutoTest()
     
-    // Refresh connection state every 30 seconds
     const refreshInterval = setInterval(() => {
       loadBaseConnections()
       loadExchangeConnectionsActive()
     }, 30000)
     
-    // Auto-test base connections every 5 minutes
     const autoTestInterval = setInterval(triggerAutoTest, 5 * 60 * 1000)
     
     return () => {
@@ -291,15 +261,15 @@ export function ConnectionStateProvider({ children }: { children: ReactNode }) {
         isBaseLoading,
         baseConnectionStatuses,
         setBaseConnectionStatus,
-        markBaseAsInserted,
+        markBaseAsAssigned,
         exchangeConnectionsActive,
         setExchangeConnectionsActive,
         loadExchangeConnectionsActive,
         isExchangeConnectionsActiveLoading,
         exchangeConnectionsActiveStatus,
         toggleExchangeConnectionsActiveStatus,
-        markExchangeAsInserted,
-        exchangeConnectionsInsertedStatus,
+        markExchangeAsAssigned,
+        exchangeConnectionsAssignedStatus,
         tradeEngineStatuses,
         updateTradeEngineStatus,
         getTradeEngineStatus,

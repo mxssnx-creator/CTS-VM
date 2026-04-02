@@ -46,10 +46,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const isEngineRunning = runningFlag === "true" || runningFlag === true
     
     // Check if this connection is currently active/dashboard enabled
-    const isActive = connection?.is_enabled_dashboard === "1" || connection?.is_enabled_dashboard === true
+    const isActive = connection?.is_main_enabled === "1" || connection?.is_main_enabled === true
     const isEnabled = connection?.is_enabled === "1" || connection?.is_enabled === true
-    const isInserted = connection?.is_inserted === "1" || connection?.is_inserted === true
-    const isActiveInserted = connection?.is_active_inserted === "1" || connection?.is_active_inserted === true
+    const isInserted = connection?.is_assigned === "1" || connection?.is_assigned === true
+    const isActiveInserted = connection?.is_active_assigned === "1" || connection?.is_active_assigned === true
     
     // Get progression state (cycles, success rates)
     const progressionState = await ProgressionStateManager.getProgressionState(connectionId)

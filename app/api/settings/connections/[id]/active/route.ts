@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { SystemLogger } from "@/lib/system-logger"
 import { initRedis, getConnection, updateConnection } from "@/lib/redis-db"
 
-// POST - Add connection to active connections (set is_enabled_dashboard flag)
+// POST - Add connection to active connections (set is_main_enabled flag)
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Update connection to be active on dashboard
     const updatedConnection = {
       ...connection,
-      is_enabled_dashboard: "1",
+      is_main_enabled: "1",
       updated_at: new Date().toISOString(),
     }
 
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // Update connection to remove from active
     const updatedConnection = {
       ...connection,
-      is_enabled_dashboard: "0",
+      is_main_enabled: "0",
       updated_at: new Date().toISOString(),
     }
 

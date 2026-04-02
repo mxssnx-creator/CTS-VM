@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
         await redisClient.hset("connection:bingx-x01", {
           api_key: bingxKey,
           api_secret: bingxSecret,
-          is_active_inserted: "1",
+          is_active_assigned: "1",
           is_enabled: "1",
-          is_enabled_dashboard: "1",
+          is_main_enabled: "1",
           connection_method: "library",
           updated_at: new Date().toISOString(),
         })

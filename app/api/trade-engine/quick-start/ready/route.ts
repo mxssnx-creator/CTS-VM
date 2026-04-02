@@ -25,8 +25,8 @@ export async function GET() {
     // Check for base connections that are inserted (even without credentials)
     const baseConnections = allConnections.filter((c: any) => {
       const exch = (c.exchange || "").toLowerCase()
-      const isBaseInserted = c.is_active_inserted === "1" || c.is_active_inserted === true ||
-                            c.is_dashboard_inserted === "1" || c.is_dashboard_inserted === true
+      const isBaseInserted = c.is_active_assigned === "1" || c.is_active_assigned === true ||
+                            c.is_main_assigned === "1" || c.is_main_assigned === true
       const isBase = exch === "bingx" || exch === "bybit" || exch === "binance" || exch === "okx"
       return isBase && isBaseInserted
     })

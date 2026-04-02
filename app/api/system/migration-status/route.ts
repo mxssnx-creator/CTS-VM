@@ -31,8 +31,8 @@ export async function GET() {
         const secret = c.api_secret || ""
         return key.length > 10 && secret.length > 10
       }).length,
-      inActivePanel: connections.filter((c: any) => c.is_active_inserted === "1" || c.is_active_inserted === true).length,
-      dashboardEnabled: connections.filter((c: any) => c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true).length,
+      inActivePanel: connections.filter((c: any) => c.is_active_assigned === "1" || c.is_active_assigned === true).length,
+      dashboardEnabled: connections.filter((c: any) => c.is_main_enabled === "1" || c.is_main_enabled === true).length,
       baseExchanges: [...new Set(connections.map((c: any) => c.exchange))].sort(),
     }
 

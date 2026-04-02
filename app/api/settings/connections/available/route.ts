@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
  * GET /api/settings/connections/available
  * Returns base connections that are:
  * 1. Enabled in Settings (is_enabled=true)
- * 2. NOT yet added to Active panel (is_active_inserted=false)
+ * 2. NOT yet added to Active panel (is_active_assigned=false)
  */
 export async function GET() {
   try {
@@ -21,7 +21,7 @@ export async function GET() {
       // Must NOT be a predefined info template
       const isPredefined = c.is_predefined === true || c.is_predefined === "1" || c.is_predefined === "true"
       // Must NOT already be in Active panel
-      const isInActivePanel = c.is_active_inserted === true || c.is_active_inserted === "1" || c.is_active_inserted === "true"
+      const isInActivePanel = c.is_active_assigned === true || c.is_active_assigned === "1" || c.is_active_assigned === "true"
       
       return isEnabled && !isPredefined && !isInActivePanel
     })

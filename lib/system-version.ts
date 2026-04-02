@@ -6,7 +6,7 @@ export const SYSTEM_VERSION = "2026.02.26.v4.5"
 // Component versions - track UI code changes
 // Increment on component modifications that require browser cache refresh
 export const COMPONENT_VERSIONS = {
-  dashboardManager: "v5", // Dashboard active connections manager - v5: fixed dashboard state fields
+  mainManager: "v6", // Main active connections manager - v6: renamed dashboard to main, inserted to assigned
   statisticsOverview: "v4", // Statistics overview widget - v4: separated indications from strategies
   systemInitializer: "v3", // System initialization - v3: added comprehensive version logging
   connectionState: "v2", // Connection state management
@@ -36,7 +36,7 @@ export function getSystemVersionInfo() {
     changelog: {
       "2026.02.26.v4.5": [
         "Incremented all component and API versions for browser cache refresh",
-        "DashboardManager v5: Fixed is_dashboard_inserted field validation",
+        "DashboardManager v5: Fixed is_main_assigned field validation",
         "StatisticsOverview v4: Separated indications (direction/move/active/optimal) from strategies (base/main/real/live)",
         "SystemInitializer v3: Added comprehensive version logging on startup",
         "ConnectionsAPI v4: Added X-API-Version header and version tracking",

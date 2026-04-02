@@ -15,7 +15,7 @@ export async function GET() {
     await initRedis()
 
     const connections = await getAllConnections()
-    const activeConnections = connections.filter((c: any) => c.is_enabled === "1" && c.is_inserted === "1")
+    const activeConnections = connections.filter((c: any) => c.is_enabled === "1" && c.is_assigned === "1")
 
     // Get engine state for first active connection
     const connectionId = activeConnections[0]?.id || "unknown"

@@ -70,14 +70,14 @@ async function main() {
       }
     }
     
-    console.log(`[Migration 015] Before: ${connId} -> is_inserted=${obj.is_inserted}, is_enabled=${obj.is_enabled}, is_predefined=${obj.is_predefined}`)
+    console.log(`[Migration 015] Before: ${connId} -> is_assigned=${obj.is_assigned}, is_enabled=${obj.is_enabled}, is_predefined=${obj.is_predefined}`)
     
     const now = new Date().toISOString()
     
     if (baseExchangeIds.includes(connId)) {
       // Mark as INSERTED and ENABLED (base connection)
       await redisCommand("HSET", `connection:${connId}`, 
-        "is_inserted", "1",
+        "is_assigned", "1",
         "is_enabled", "1", 
         "is_predefined", "1",
         "updated_at", now
@@ -87,10 +87,10 @@ async function main() {
     } else {
       // Template only - NOT inserted, NOT enabled
       await redisCommand("HSET", `connection:${connId}`,
-        "is_inserted", "0",
+        "is_assigned", "0",
         "is_enabled", "0",
         "is_predefined", "1",
-        "is_enabled_dashboard", "0",
+        "is_main_enabled", "0",
         "updated_at", now
       )
       updatedOther++
@@ -113,7 +113,7 @@ async function main() {
         obj[data[i]] = data[i + 1]
       }
     }
-    console.log(`[Migration 015] VERIFY ${baseId}: is_inserted=${obj.is_inserted}, is_enabled=${obj.is_enabled}, is_enabled_dashboard=${obj.is_enabled_dashboard}`)
+    console.log(`[Migration 015] VERIFY ${baseId}: is_assigned=${obj.is_assigned}, is_enabled=${obj.is_enabled}, is_main_enabled=${obj.is_main_enabled}`)
   }
 }
 

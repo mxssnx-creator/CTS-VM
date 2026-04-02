@@ -54,14 +54,14 @@ export async function GET() {
     // ACTIVE PANEL = Connections marked as active-inserted (shown in Active Connections panel)
     // These can be predefined templates OR user-created connections
     const activeInsertedAll = allConnections.filter((c: any) => {
-      const ai = c.is_active_inserted
+      const ai = c.is_active_assigned
       return ai === true || ai === "1" || ai === "true"
     })
     console.log(`[v0] [SystemStats] In Active panel: ${activeInsertedAll.length}`)
     
     // ENABLED ON DASHBOARD = Active connections that user has toggled ON
     const enabledDashboard = activeInsertedAll.filter((c: any) => {
-      const e = c.is_enabled_dashboard
+      const e = c.is_main_enabled
       return e === true || e === "1" || e === "true"
     })
     console.log(`[v0] [SystemStats] Enabled on dashboard: ${enabledDashboard.length}`)
@@ -99,7 +99,7 @@ export async function GET() {
 
     // Main/Preset only show "running" when:
     // 1. Global engine is running AND
-    // 2. At least one connection has the dashboard Enable slider ON (is_enabled_dashboard=1)
+    // 2. At least one connection has the dashboard Enable slider ON (is_main_enabled=1)
     //    AND that connection has live/preset trade enabled
     const anyDashboardEnabled = enabledDashboard.length > 0
     const mainStatus = globalStatus === "running" && anyDashboardEnabled && liveTradeCount > 0
@@ -121,10 +121,10 @@ export async function GET() {
     })
     console.log(`[v0] [SystemStats] Connections with valid credentials: ${connectionsWithCredentials.length}`)
     
-    // EXCHANGE CONNECTIONS = Base connections that are inserted as connection cards (is_active_inserted=1)
+    // EXCHANGE CONNECTIONS = Base connections that are inserted as connection cards (is_active_assigned=1)
     // Independent of credentials - just counting which are added to the active panel
     const insertedBaseConnections = baseConnections.filter((c: any) => {
-      const isInserted = c.is_active_inserted === true || c.is_active_inserted === "1" || c.is_active_inserted === "true"
+      const isInserted = c.is_active_assigned === true || c.is_active_assigned === "1" || c.is_active_assigned === "true"
       return isInserted
     })
     console.log(`[v0] [SystemStats] Exchange connections (inserted as cards): ${insertedBaseConnections.length}`)
@@ -174,7 +174,7 @@ export async function GET() {
       },
       // Available connections = enabled base connections NOT yet in Active panel
       availableConnections: enabledBase.filter((c: any) => {
-        const ai = c.is_active_inserted
+        const ai = c.is_active_assigned
         return !(ai === true || ai === "1" || ai === "true")
       }).length,
       liveTrades: {

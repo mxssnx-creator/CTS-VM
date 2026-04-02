@@ -66,8 +66,8 @@ export async function GET() {
             // Settings states - all start disabled, user enables when they add API keys
             is_enabled: "0",
             // Active states - INDEPENDENT from Settings
-            is_active_inserted: shouldDashboardInsert ? "1" : "0", // Only bybit/bingx active-insertable
-            is_enabled_dashboard: "0", // Always disabled by default
+            is_active_assigned: shouldDashboardInsert ? "1" : "0", // Only bybit/bingx active-insertable
+            is_main_enabled: "0", // Always disabled by default
             is_predefined: true,
             api_key: predefined.apiKey || "",
             api_secret: predefined.apiSecret || "",
@@ -88,19 +88,19 @@ export async function GET() {
     
     console.log(`[v0] [Init] Created ${createdConnections.length} active connections (bybit, bingx)`)
     
-    // MIGRATION: Ensure bybit and bingx have is_active_inserted set (one-time migration)
+    // MIGRATION: Ensure bybit and bingx have is_active_assigned set (one-time migration)
     const allConns = await getAllConnections()
     let migratedCount = 0
     for (const conn of allConns) {
       const exchange = (conn.exchange || "").toLowerCase().trim()
       const shouldBeActive = DASHBOARD_AUTO_INSERT.includes(exchange)
       
-      // Only migrate if is_active_inserted is undefined (not yet set)
-      if (shouldBeActive && conn.is_active_inserted === undefined) {
+      // Only migrate if is_active_assigned is undefined (not yet set)
+      if (shouldBeActive && conn.is_active_assigned === undefined) {
         await updateConnection(conn.id, {
           ...conn,
-          is_active_inserted: "1", // Add as active-insertable
-          is_enabled_dashboard: "0",   // But disabled by default
+          is_active_assigned: "1", // Add as active-insertable
+          is_main_enabled: "0",   // But disabled by default
           updated_at: new Date().toISOString(),
         })
         migratedCount++

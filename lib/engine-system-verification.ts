@@ -38,9 +38,9 @@ interface ConnectionCheck {
     id: string
     name: string
     exchange: string
-    is_inserted: string
+    is_assigned: string
     is_enabled: string
-    is_active_inserted: string
+    is_active_assigned: string
   }[]
   status: "ok" | "missing" | "misconfigured"
   details: string
@@ -100,18 +100,18 @@ export async function verifyEngineSystem(): Promise<VerificationReport> {
     
     const connectionCheck: ConnectionCheck = {
       totalConnections: allConnections.length,
-      insertedConnections: allConnections.filter((c: any) => c.is_inserted === "1").length,
+      insertedConnections: allConnections.filter((c: any) => c.is_assigned === "1").length,
       enabledConnections: enabledConnections.length,
-      activeConnections: allConnections.filter((c: any) => c.is_active_inserted === "1").length,
+      activeConnections: allConnections.filter((c: any) => c.is_active_assigned === "1").length,
       baseConnections: allConnections
-        .filter((c: any) => (c.is_inserted === "1" || c.is_active_inserted === "1") && (c.is_predefined === "1" || !c.is_predefined))
+        .filter((c: any) => (c.is_assigned === "1" || c.is_active_assigned === "1") && (c.is_predefined === "1" || !c.is_predefined))
         .map((c: any) => ({
           id: c.id,
           name: c.name,
           exchange: c.exchange,
-          is_inserted: c.is_inserted || "0",
+          is_assigned: c.is_assigned || "0",
           is_enabled: c.is_enabled || "0",
-          is_active_inserted: c.is_active_inserted || "0",
+          is_active_assigned: c.is_active_assigned || "0",
         })),
       status: "ok",
       details: "",

@@ -42,7 +42,7 @@ export const PREDEFINED_EXCHANGE_INFO = [
 /**
  * Seeds BASE CONNECTIONS from predefined exchange info
  * Base connections are ENABLED by default in Settings
- * But NOT inserted into Active panel (user must add them)
+ * But NOT assigned to Active panel (user must add them)
  */
 export async function seedDefaultExchanges() {
   console.log("[v0] Seeding base connections from predefined info...")
@@ -80,9 +80,9 @@ export async function seedDefaultExchanges() {
         is_preset_trade: false,
         is_active: false,
         is_predefined: false, // NOT predefined - this is a real connection
-        is_active_inserted: false, // NOT in Active panel by default
-        is_enabled_dashboard: false, // Dashboard toggle OFF
-        is_inserted: false,
+        is_active_assigned: false, // NOT in Active panel by default
+        is_main_enabled: false, // Main page toggle OFF
+        is_assigned: false,
         volume_factor: 1.0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -146,7 +146,7 @@ export async function ensureDefaultExchangesExist() {
 }
 
 /**
- * Get list of available base connections (enabled in Settings, can be added to Active panel)
+ * Get list of available base connections (enabled in Settings, can be added to Main panel)
  */
 export async function getAvailableBaseConnections() {
   await initRedis()
@@ -155,7 +155,7 @@ export async function getAvailableBaseConnections() {
   // Return base connections that are ENABLED but NOT yet in Active panel
   return allConnections?.filter((c) => {
     const isEnabled = c.is_enabled === true || c.is_enabled === "1"
-    const isInActivePanel = c.is_active_inserted === true || c.is_active_inserted === "1"
+    const isInActivePanel = c.is_active_assigned === true || c.is_active_assigned === "1"
     return isEnabled && !isInActivePanel
   }) || []
 }

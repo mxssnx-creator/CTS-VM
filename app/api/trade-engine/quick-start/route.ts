@@ -64,8 +64,8 @@ export async function POST(request: Request) {
       return exch === "bybit" && hasCredentials
     }) || allConnections.find((c: any) => {
       const exch = (c.exchange || "").toLowerCase()
-      const isBaseInserted = c.is_active_inserted === "1" || c.is_active_inserted === true || 
-                            c.is_dashboard_inserted === "1" || c.is_dashboard_inserted === true
+      const isBaseInserted = c.is_active_assigned === "1" || c.is_active_assigned === true || 
+                            c.is_main_assigned === "1" || c.is_main_assigned === true
       const isBase = exch === "bingx" || exch === "bybit" || exch === "binance" || exch === "okx"
       return isBase && isBaseInserted
     })
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
             id: c.id,
             exchange: c.exchange,
             hasCredentials: !!(c.api_key && c.api_secret && c.api_key.length >= 10),
-            isActiveInserted: c.is_active_inserted === "1" || c.is_active_inserted === true,
+            isActiveInserted: c.is_active_assigned === "1" || c.is_active_assigned === true,
           })),
           logs: await getProgressionLogs("global"),
         },
@@ -108,8 +108,8 @@ export async function POST(request: Request) {
       console.log(`${LOG_PREFIX}: Disabling ${connection.name}...`)
       const disabled = {
         ...connection,
-        is_dashboard_inserted: "0",
-        is_enabled_dashboard: "0",
+        is_main_assigned: "0",
+        is_main_enabled: "0",
         is_enabled: "0",
         updated_at: new Date().toISOString(),
       }
@@ -230,11 +230,11 @@ export async function POST(request: Request) {
     const enabled = {
       ...connection,
       is_enabled: "1",
-      is_enabled_dashboard: "0",
-      is_dashboard_inserted: "1",
-      is_active_inserted: "1",
+      is_main_enabled: "0",
+      is_main_assigned: "1",
+      is_active_assigned: "1",
       is_active: "1",
-      is_inserted: "1",
+      is_assigned: "1",
       is_testnet: false,
       active_symbols: JSON.stringify(symbols),
       last_test_status: testPassed ? "success" : "failed",
@@ -247,7 +247,7 @@ export async function POST(request: Request) {
     
     await logProgressionEvent(connectionId, "quickstart_updated", "info", "Connection state updated", {
       is_enabled: "1",
-      is_active_inserted: "1",
+      is_active_assigned: "1",
       symbols,
     })
     

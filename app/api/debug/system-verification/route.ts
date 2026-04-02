@@ -29,7 +29,7 @@ export async function GET() {
       pionex: connections.some((c: any) => c.exchange === "pionex"),
       orangex: connections.some((c: any) => c.exchange === "orangex"),
       bingx_api_key_length: bingxConn?.api_key?.length || 0,
-      bingx_is_inserted: bingxConn?.is_inserted,
+      bingx_is_inserted: bingxConn?.is_assigned,
       bingx_is_active: bingxConn?.is_active,
     }
 

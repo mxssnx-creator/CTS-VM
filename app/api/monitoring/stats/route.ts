@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     await initRedis()
 
-    // Get ONLY active connections (is_enabled_dashboard = true) for monitoring
+    // Get ONLY active connections (is_main_enabled = true) for monitoring
     let connections = await getActiveConnectionsForEngine()
 
     if (exchangeFilter) {

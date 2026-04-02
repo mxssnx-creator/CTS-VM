@@ -18,10 +18,10 @@ export async function POST() {
       // Force disable all connections on dashboard
       const updated = {
         ...conn,
-        is_enabled_dashboard: "0",      // NOT enabled by default
-        is_dashboard_inserted: "1",     // But inserted (visible)
+        is_main_enabled: "0",      // NOT enabled by default
+        is_main_assigned: "1",     // But inserted (visible)
         is_enabled: "0",                // NOT enabled in settings
-        is_active_inserted: "0",        // NOT in active panel
+        is_active_assigned: "0",        // NOT in active panel
         is_active: "0",                 // NOT processing
         updated_at: new Date().toISOString(),
       }

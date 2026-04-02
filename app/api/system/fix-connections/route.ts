@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic"
  * POST /api/system/fix-connections
  * 
  * Fixes all 4 base connections (bybit, bingx, pionex, orangex) to be:
- * - is_active_inserted = 1 (in Active panel)
+ * - is_active_assigned = 1 (in Active panel)
  * - is_enabled = 1 (enabled)
- * - is_enabled_dashboard = 1 (dashboard toggle on)
+ * - is_main_enabled = 1 (dashboard toggle on)
  * - connection_method = library (use native SDK)
  * 
  * Also injects credentials from environment variables if available.
@@ -34,10 +34,10 @@ export async function POST() {
       
       // Build update data
       const updateData: Record<string, string> = {
-        is_inserted: "1",
+        is_assigned: "1",
         is_enabled: "1",
-        is_active_inserted: "1",
-        is_enabled_dashboard: "1",
+        is_active_assigned: "1",
+        is_main_enabled: "1",
         is_active: "1",
         is_predefined: "1",
         connection_method: "library",
@@ -108,9 +108,9 @@ export async function GET() {
           exists: true,
           name: conn.name || id,
           exchange: conn.exchange,
-          is_active_inserted: conn.is_active_inserted,
+          is_active_assigned: conn.is_active_assigned,
           is_enabled: conn.is_enabled,
-          is_enabled_dashboard: conn.is_enabled_dashboard,
+          is_main_enabled: conn.is_main_enabled,
           has_credentials: !!(conn.api_key && conn.api_key.length > 10 && conn.api_secret && conn.api_secret.length > 10),
           connection_method: conn.connection_method || "rest",
         }
@@ -125,7 +125,7 @@ export async function GET() {
       summary: {
         total: baseIds.length,
         existing: Object.values(status).filter((s: any) => s.exists).length,
-        activeInserted: Object.values(status).filter((s: any) => s.is_active_inserted === "1").length,
+        activeInserted: Object.values(status).filter((s: any) => s.is_active_assigned === "1").length,
         withCredentials: Object.values(status).filter((s: any) => s.has_credentials).length,
       },
     })

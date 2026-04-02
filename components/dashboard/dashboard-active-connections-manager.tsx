@@ -77,18 +77,18 @@ export function DashboardActiveConnectionsManager() {
         const exchange = (conn.exchange || "").toLowerCase().trim()
         const isBase = BASE_EXCHANGES.includes(exchange)
 
-        // is_active_inserted = "1" means this connection is in Active panel
+        // is_active_assigned = "1" means this connection is in Active panel
         // This applies to BOTH predefined templates (when enabled) AND user-created connections
         const isActiveInserted =
-          conn.is_active_inserted === "1" ||
-          conn.is_active_inserted === true ||
-          conn.is_dashboard_inserted === "1" ||
-          conn.is_dashboard_inserted === true
+          conn.is_active_assigned === "1" ||
+          conn.is_active_assigned === true ||
+          conn.is_main_assigned === "1" ||
+          conn.is_main_assigned === true
 
         // isEnabledDashboard = connection's dashboard toggle is ON (processing enabled)
         const isEnabledDashboard =
-          conn.is_enabled_dashboard === true ||
-          conn.is_enabled_dashboard === "1"
+          conn.is_main_enabled === true ||
+          conn.is_main_enabled === "1"
 
         if (isBase && isActiveInserted) {
           if (seenIds.has(conn.id)) continue
@@ -192,10 +192,10 @@ export function DashboardActiveConnectionsManager() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          is_enabled_dashboard: newState,
-          // If disabling, also remove from dashboard permanently (is_dashboard_inserted = "0")
+          is_main_enabled: newState,
+          // If disabling, also remove from dashboard permanently (is_main_assigned = "0")
           // If enabling, keep dashboard_inserted as is
-          ...(newState ? {} : { is_dashboard_inserted: "0" })
+          ...(newState ? {} : { is_main_assigned: "0" })
         }),
         cache: "no-store"
       })
@@ -282,7 +282,7 @@ export function DashboardActiveConnectionsManager() {
       await fetch(`/api/settings/connections/${connectionId}/toggle-dashboard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_enabled_dashboard: false }),
+        body: JSON.stringify({ is_main_enabled: false }),
       })
       updateActiveConnections(prev => prev.filter(ac => ac.connectionId !== connectionId))
       toast.success("Connection removed", {

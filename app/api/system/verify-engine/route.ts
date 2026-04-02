@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const coordinator = getGlobalTradeEngineCoordinator()
     const connections = loadConnections()
-    const activeConnections = connections.filter((c) => c.is_active_inserted === "1" || c.is_active_inserted === true)
+    const activeConnections = connections.filter((c) => c.is_active_assigned === "1" || c.is_active_assigned === true)
 
     console.log("[v0] [SystemVerify] Starting comprehensive verification...")
 

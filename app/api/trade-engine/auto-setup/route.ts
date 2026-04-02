@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     // Check if already in active connections (multiple ways it might be flagged)
-    const isAlreadyActive = (bingxConnection.is_active_inserted === "1" || bingxConnection.is_active_inserted === true) &&
+    const isAlreadyActive = (bingxConnection.is_active_assigned === "1" || bingxConnection.is_active_assigned === true) &&
                             (bingxConnection.is_active === "1" || bingxConnection.is_active === true)
     
     if (isAlreadyActive) {
@@ -58,9 +58,9 @@ export async function POST(request: Request) {
     console.log(`[v0] [AutoSetup] Adding ${bingxConnection.name} to active connections (mainnet only)...`)
     const updated = {
       ...bingxConnection,
-      is_active_inserted: "1",
+      is_active_assigned: "1",
       is_active: "1",
-      is_inserted: "1",
+      is_assigned: "1",
       is_enabled: "1",
       is_testnet: false, // FORCE mainnet - never use testnet
       updated_at: new Date().toISOString(),

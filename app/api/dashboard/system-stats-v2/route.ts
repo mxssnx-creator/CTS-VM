@@ -26,7 +26,7 @@ export async function GET() {
     const workingBase = baseConnections.filter((c: any) => c.last_test_status === "success")
 
     const activeConnections = allConnections.filter((c: any) => {
-      const d = c.is_enabled_dashboard
+      const d = c.is_main_enabled
       return d === true || d === "1" || d === "true"
     })
 

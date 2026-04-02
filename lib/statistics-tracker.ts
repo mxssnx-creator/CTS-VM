@@ -67,7 +67,7 @@ export async function trackStrategyStats(
 }
 
 /**
- * Get recent indication statistics for dashboard
+ * Get recent indication statistics for main page
  */
 export async function getIndicationStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
   const client = getRedisClient();
@@ -110,7 +110,7 @@ export async function getIndicationStats(connectionId: string, hoursBack: number
 }
 
 /**
- * Get recent strategy statistics for dashboard
+ * Get recent strategy statistics for main page
  */
 export async function getStrategyStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
   const client = getRedisClient();

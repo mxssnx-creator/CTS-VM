@@ -317,11 +317,11 @@ const migrations: Migration[] = [
               position_mode: "hedge",
               is_testnet: "0",
               is_enabled: "0",
-              is_enabled_dashboard: "0",
+              is_main_enabled: "0",
               is_active: "0",
               is_predefined: "1",
-              is_inserted: "0",
-              is_active_inserted: "0",
+              is_assigned: "0",
+              is_active_assigned: "0",
               is_live_trade: "0",
               is_preset_trade: "0",
               created_at: new Date().toISOString(),
@@ -365,11 +365,11 @@ const migrations: Migration[] = [
         if (baseTemplateIds.includes(connId)) {
           // Base templates: marked as PREDEFINED, disabled, not inserted (templates only)
           await client.hset(`connection:${connId}`, {
-            is_inserted: "0",        // NOT inserted - templates only
+            is_assigned: "0",        // NOT inserted - templates only
             is_enabled: "0",         // NOT enabled by default
             is_predefined: "1",      // These are predefined templates
-            is_active_inserted: "0", // NOT in active panel
-            is_enabled_dashboard: "0",
+            is_active_assigned: "0", // NOT in active panel
+            is_main_enabled: "0",
             updated_at: new Date().toISOString(),
           })
           updatedBase++
@@ -377,11 +377,11 @@ const migrations: Migration[] = [
         } else {
           // Other predefined connections: all templates
           await client.hset(`connection:${connId}`, {
-            is_inserted: "0",
+            is_assigned: "0",
             is_enabled: "0",
             is_predefined: "1",
-            is_active_inserted: "0",
-            is_enabled_dashboard: "0",
+            is_active_assigned: "0",
+            is_main_enabled: "0",
             updated_at: new Date().toISOString(),
           })
           updatedOther++
@@ -486,10 +486,10 @@ const migrations: Migration[] = [
           // Mark as INSERTED, ENABLED, and ACTIVE_INSERTED by default (base connection)
           // Base connections are automatically enabled and added to Active panel
           await client.hset(`connection:${connId}`, {
-            is_inserted: "1",
+            is_assigned: "1",
             is_enabled: "1",              // ENABLED by default
-            is_active_inserted: "1",      // Added to Active panel
-            is_enabled_dashboard: "1",    // Dashboard toggle enabled
+            is_active_assigned: "1",      // Added to Active panel
+            is_main_enabled: "1",    // Dashboard toggle enabled
             is_active: "1",
             is_predefined: "1",
             connection_method: "library", // Use native SDK by default
@@ -501,10 +501,10 @@ const migrations: Migration[] = [
           // Non-base predefined connections: just informational templates
           // NOT inserted, NOT enabled - they are templates only
           await client.hset(`connection:${connId}`, {
-            is_inserted: "0",
+            is_assigned: "0",
             is_enabled: "0",
             is_predefined: "1",
-            is_enabled_dashboard: "0",
+            is_main_enabled: "0",
             updated_at: new Date().toISOString(),
           })
           updatedOther++
@@ -551,10 +551,10 @@ const migrations: Migration[] = [
           // Base connections: inserted and enabled by default
           // Update with env credentials if available (for BingX)
           const updateData: Record<string, string> = {
-            is_inserted: "1",        // INSERTED
+            is_assigned: "1",        // INSERTED
             is_enabled: "1",         // ENABLED
-            is_active_inserted: "1", // In active panel
-            is_enabled_dashboard: "1",
+            is_active_assigned: "1", // In active panel
+            is_main_enabled: "1",
             is_active: "1",
             connection_method: "library", // Use native SDK by default
             updated_at: new Date().toISOString(),
@@ -571,16 +571,16 @@ const migrations: Migration[] = [
           updatedTemplates++
           console.log(`[v0] Migration 016: ✓ ${connId} -> inserted=1, enabled=1, active=1 (base connection)`)
         } else if (!isPredefined) {
-          // User-created connections: reset dashboard state if not properly set
-          if (!connData.is_active_inserted || !connData.is_enabled_dashboard) {
+          // User-created connections: reset main state if not properly set
+          if (!connData.is_active_assigned || !connData.is_main_enabled) {
             await client.hset(`connection:${connId}`, {
-              is_active_inserted: "0",      // Default: NOT in active panel
-              is_enabled_dashboard: "0",    // Default: NOT enabled
+              is_active_assigned: "0",      // Default: NOT in active panel
+              is_main_enabled: "0",    // Default: NOT enabled
               is_enabled: connData.is_enabled || "0",  // Preserve existing enabled state
               updated_at: new Date().toISOString(),
             })
             updatedUserConnections++
-            console.log(`[v0] Migration 016: ✓ ${connId} reset dashboard state to defaults`)
+            console.log(`[v0] Migration 016: ✓ ${connId} reset main state to defaults`)
           }
         }
       }
@@ -641,9 +641,9 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
               await client.hset(`connection:${connId}`, {
                 api_key: apiKey,
                 api_secret: apiSecret,
-                is_active_inserted: "1",
+                is_active_assigned: "1",
                 is_enabled: "1",
-                is_enabled_dashboard: "1",
+                is_main_enabled: "1",
                 connection_method: "library",
                 updated_at: new Date().toISOString(),
               })
@@ -700,9 +700,9 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     
     for (const connId of baseConnections) {
       const updateData: Record<string, string> = {
-        is_active_inserted: "1",
+        is_active_assigned: "1",
         is_enabled: "1",
-        is_enabled_dashboard: "1",
+        is_main_enabled: "1",
         is_active: "1",
         connection_method: "library",
         updated_at: new Date().toISOString(),

@@ -202,7 +202,7 @@ export function startPeriodicConnectionTesting() {
   }
 }
 async function initializeDefaultActiveConnections() {
-  console.log("[v0] [Seed] Initializing default active connections (Bybit & BingX)...")
+  console.log("[v0] [Seed] Initializing default main connections (Bybit & BingX)...")
   try {
     const allConnections = await getAllConnections()
     
@@ -212,43 +212,43 @@ async function initializeDefaultActiveConnections() {
     
     let activatedCount = 0
     
-    // Set bybit-x03 as active connection (is_enabled_dashboard = true)
+    // Set bybit-x03 as main connection (is_main_enabled = true)
     if (bybit) {
-      if (!bybit.is_enabled_dashboard || bybit.is_enabled_dashboard === "0") {
-        console.log("[v0] [Seed] Setting bybit-x03 as active connection...")
+      if (!bybit.is_main_enabled || bybit.is_main_enabled === "0") {
+        console.log("[v0] [Seed] Setting bybit-x03 as main connection...")
         await updateConnection("bybit-x03", {
           ...bybit,
-          is_enabled_dashboard: "1"
+          is_main_enabled: "1"
         })
         activatedCount++
-        console.log("[v0] [Seed] ✓ bybit-x03 added to active connections")
+        console.log("[v0] [Seed] bybit-x03 added to main connections")
       } else {
-        console.log("[v0] [Seed] bybit-x03 already on active list")
+        console.log("[v0] [Seed] bybit-x03 already on main list")
       }
     } else {
       console.warn("[v0] [Seed] bybit-x03 not found in database")
     }
     
-    // Set bingx-x01 as active connection (is_enabled_dashboard = true)
+    // Set bingx-x01 as main connection (is_main_enabled = true)
     if (bingx) {
-      if (!bingx.is_enabled_dashboard || bingx.is_enabled_dashboard === "0") {
-        console.log("[v0] [Seed] Setting bingx-x01 as active connection...")
+      if (!bingx.is_main_enabled || bingx.is_main_enabled === "0") {
+        console.log("[v0] [Seed] Setting bingx-x01 as main connection...")
         await updateConnection("bingx-x01", {
           ...bingx,
-          is_enabled_dashboard: "1"
+          is_main_enabled: "1"
         })
         activatedCount++
-        console.log("[v0] [Seed] ✓ bingx-x01 added to active connections")
+        console.log("[v0] [Seed] bingx-x01 added to main connections")
       } else {
-        console.log("[v0] [Seed] bingx-x01 already on active list")
+        console.log("[v0] [Seed] bingx-x01 already on main list")
       }
     } else {
       console.warn("[v0] [Seed] bingx-x01 not found in database")
     }
     
-    console.log(`[v0] [Seed] Default active connections initialized: ${activatedCount} connections added to active list`)
+    console.log(`[v0] [Seed] Default main connections initialized: ${activatedCount} connections added`)
   } catch (error) {
-    console.error("[v0] [Seed] Failed to initialize default active connections:", error)
+    console.error("[v0] [Seed] Failed to initialize default main connections:", error)
   }
 }
 

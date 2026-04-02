@@ -1,14 +1,14 @@
 /**
  * Active Connections Manager
  * Handles connections actively in use for trading (INDEPENDENT from Settings)
- * Uses Redis as single source of truth (via is_enabled_dashboard field)
+ * Uses Redis as single source of truth (via is_main_enabled field)
  *
  * TERMINOLOGY:
- * - These are called "Active Connections" or "Actively Using" connections
+ * - These are called "Main Connections" or "Actively Using" connections
  * - NOT called "Dashboard Connections" to avoid confusion
  *
  * INDEPENDENCE GUARANTEE:
- * - Toggling an Active connection does NOT affect Settings connections
+ * - Toggling a Main connection does NOT affect Settings connections
  * - Settings connections status (is_enabled) is COMPLETELY INDEPENDENT
  * - Each has its own toggle/state system managed separately
  */
@@ -20,17 +20,17 @@ export interface ActiveConnection {
   id: string
   connectionId: string
   exchangeName: string
-  isActive: boolean       // Maps to is_enabled_dashboard (Active/Dashboard toggle, INDEPENDENT)
+  isActive: boolean       // Maps to is_main_enabled (Main page toggle, INDEPENDENT)
   isBaseEnabled: boolean  // Maps to is_enabled (Settings base enabled, read-only here)
   addedAt: string
 }
 
 /**
- * Load connections for the Active Connections list on the Dashboard.
+ * Load connections for the Main Connections list on the Main page.
  * Shows:
- * - ALL inserted base connections (is_inserted=1) -- always visible as cards
- * - ANY connection with is_enabled_dashboard=1 -- user-activated connections
- * isActive = is_enabled_dashboard (the active toggle, independent from Settings)
+ * - ALL assigned base connections (is_assigned=1) -- always visible as cards
+ * - ANY connection with is_main_enabled=1 -- user-activated connections
+ * isActive = is_main_enabled (the active toggle, independent from Settings)
  */
 export async function loadActiveConnections(): Promise<ActiveConnection[]> {
   try {
@@ -42,13 +42,13 @@ export async function loadActiveConnections(): Promise<ActiveConnection[]> {
 
     for (const conn of allConnections) {
       const exchange = (conn.exchange || "").toLowerCase().trim()
-      const isInserted = conn.is_inserted === true || conn.is_inserted === "1" || conn.is_inserted === "true"
-      const isDashboardActive = conn.is_enabled_dashboard === true || conn.is_enabled_dashboard === "1" || conn.is_enabled_dashboard === "true"
+      const isAssigned = conn.is_assigned === true || conn.is_assigned === "1" || conn.is_assigned === "true"
+      const isMainEnabled = conn.is_main_enabled === true || conn.is_main_enabled === "1" || conn.is_main_enabled === "true"
       const isSettingsEnabled = conn.is_enabled === true || conn.is_enabled === "1" || conn.is_enabled === "true"
       const isBase = BASE_EXCHANGES.includes(exchange)
 
-      // Show if: it's a base exchange, OR it's inserted, OR it's dashboard-active
-      if (isBase || isInserted || isDashboardActive) {
+      // Show if: it's a base exchange, OR it's assigned, OR it's main-enabled
+      if (isBase || isAssigned || isMainEnabled) {
         if (seenIds.has(conn.id)) continue
         seenIds.add(conn.id)
 
@@ -56,17 +56,17 @@ export async function loadActiveConnections(): Promise<ActiveConnection[]> {
           id: `active-${conn.id}`,
           connectionId: conn.id,
           exchangeName: conn.exchange.charAt(0).toUpperCase() + conn.exchange.slice(1),
-          isActive: isDashboardActive,
+          isActive: isMainEnabled,
           isBaseEnabled: isSettingsEnabled,
           addedAt: conn.created_at || new Date().toISOString(),
         })
       }
     }
 
-    console.log(`[v0] [ActiveConnections] Loaded ${activeConnections.length} connections (${activeConnections.filter(c => c.isActive).length} active)`)
+    console.log(`[v0] [MainConnections] Loaded ${activeConnections.length} connections (${activeConnections.filter(c => c.isActive).length} active)`)
     return activeConnections
   } catch (error) {
-    console.error("[v0] Error loading active connections from Redis:", error)
+    console.error("[v0] Error loading main connections from Redis:", error)
     return getDefaultActiveConnections()
   }
 }
@@ -79,16 +79,16 @@ export async function saveActiveConnections(connections: ActiveConnection[]): Pr
       try {
         const connection = await getConnection(ac.connectionId)
         if (connection) {
-          // Save is_enabled_dashboard (Dashboard active state) - NOT is_enabled
-          connection.is_enabled_dashboard = ac.isActive ? "1" : "0"
+          // Save is_main_enabled (Main page active state) - NOT is_enabled
+          connection.is_main_enabled = ac.isActive ? "1" : "0"
           await updateConnection(ac.connectionId, connection)
         }
       } catch (e) {
-        console.warn(`[v0] [ActiveConnections] Could not update ${ac.connectionId}:`, e)
+        console.warn(`[v0] [MainConnections] Could not update ${ac.connectionId}:`, e)
       }
     }
   } catch (error) {
-    console.error("[v0] Error saving active connections to Redis:", error)
+    console.error("[v0] Error saving main connections to Redis:", error)
   }
 }
 
@@ -96,7 +96,7 @@ export async function addActiveConnection(connectionId: string, exchangeName: st
   try {
     await initRedis()
 
-    console.log(`[v0] [ActiveConnections] Adding connection ${connectionId} (${exchangeName}) to active list`)
+    console.log(`[v0] [MainConnections] Adding connection ${connectionId} (${exchangeName}) to main list`)
 
     // Use getAllConnections (which is proven reliable) instead of getConnection
     let connection = null
@@ -106,36 +106,36 @@ export async function addActiveConnection(connectionId: string, exchangeName: st
     
     // Fallback: search through getAllConnections if direct lookup fails
     if (!connection) {
-      console.log(`[v0] [ActiveConnections] Direct lookup failed for ${connectionId}, falling back to getAllConnections`)
+      console.log(`[v0] [MainConnections] Direct lookup failed for ${connectionId}, falling back to getAllConnections`)
       const allConnections = await getAllConnections()
-      console.log(`[v0] [ActiveConnections] getAllConnections returned ${allConnections.length} connections`)
+      console.log(`[v0] [MainConnections] getAllConnections returned ${allConnections.length} connections`)
       connection = allConnections.find((c: any) => c.id === connectionId)
       
       if (connection) {
-        console.log(`[v0] [ActiveConnections] Found ${connectionId} via getAllConnections fallback`)
+        console.log(`[v0] [MainConnections] Found ${connectionId} via getAllConnections fallback`)
       }
     }
     
     if (!connection) {
-      console.error(`[v0] [ActiveConnections] Connection ${connectionId} not found in Redis at all`)
+      console.error(`[v0] [MainConnections] Connection ${connectionId} not found in Redis at all`)
       throw new Error(`Connection ${connectionId} not found in database`)
     }
 
-    console.log(`[v0] [ActiveConnections] Setting is_enabled_dashboard=1 for ${connectionId}`)
-    connection.is_enabled_dashboard = "1"
+    console.log(`[v0] [MainConnections] Setting is_main_enabled=1 for ${connectionId}`)
+    connection.is_main_enabled = "1"
     await updateConnection(connectionId, connection)
-    console.log(`[v0] [ActiveConnections] Successfully added ${connectionId} to active list`)
+    console.log(`[v0] [MainConnections] Successfully added ${connectionId} to main list`)
 
     return {
       id: `active-${connectionId}`,
       connectionId,
       exchangeName,
-      isActive: true, // We just set is_enabled_dashboard = "1"
+      isActive: true, // We just set is_main_enabled = "1"
       isBaseEnabled: connection.is_enabled === true || connection.is_enabled === "1" || connection.is_enabled === "true",
       addedAt: connection.created_at || new Date().toISOString(),
     }
   } catch (error) {
-    console.error("[v0] Error adding active connection:", error)
+    console.error("[v0] Error adding main connection:", error)
     throw error
   }
 }
@@ -150,17 +150,17 @@ export async function removeActiveConnection(connectionId: string): Promise<void
       connection = all.find((c: any) => c.id === connectionId)
     }
     if (connection) {
-      connection.is_enabled_dashboard = "0"
+      connection.is_main_enabled = "0"
       await updateConnection(connectionId, connection)
     }
   } catch (error) {
-    console.error("[v0] Error removing active connection:", error)
+    console.error("[v0] Error removing main connection:", error)
     throw error
   }
 }
 
 /**
- * Toggle is_enabled_dashboard (Active/Dashboard toggle) - INDEPENDENT from Settings is_enabled
+ * Toggle is_main_enabled (Main page toggle) - INDEPENDENT from Settings is_enabled
  */
 export async function toggleActiveConnection(connectionId: string, isActive: boolean): Promise<void> {
   try {
@@ -172,13 +172,13 @@ export async function toggleActiveConnection(connectionId: string, isActive: boo
       connection = all.find((c: any) => c.id === connectionId)
     }
     if (connection) {
-      // Toggle is_enabled_dashboard (Dashboard active state) - NOT is_enabled (Settings state)
-      connection.is_enabled_dashboard = isActive ? "1" : "0"
+      // Toggle is_main_enabled (Main page active state) - NOT is_enabled (Settings state)
+      connection.is_main_enabled = isActive ? "1" : "0"
       await updateConnection(connectionId, connection)
-      console.log(`[v0] [ActiveConnections] Toggled ${connectionId} active: ${isActive}`)
+      console.log(`[v0] [MainConnections] Toggled ${connectionId} active: ${isActive}`)
     }
   } catch (error) {
-    console.error("[v0] Error toggling active connection:", error)
+    console.error("[v0] Error toggling main connection:", error)
     throw error
   }
 }

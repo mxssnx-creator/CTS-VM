@@ -3,7 +3,7 @@ import { initRedis, getConnection, updateConnection, setSettings, getSettings } 
 import { toggleConnectionLimiter } from "@/lib/connection-rate-limiter"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 
-// POST toggle connection active status (inserted/enabled) - INDEPENDENT from Settings
+// POST toggle connection active status (assigned/enabled) - INDEPENDENT from Settings
 // When enabling, also triggers engine start for this connection
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,15 +27,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     
     // Support both active fields:
-    // - is_active_inserted: whether connection appears in active list
-    // - is_enabled_dashboard: whether connection is enabled/active
-    const { is_active_inserted, is_enabled_dashboard } = body
+    // - is_active_assigned: whether connection appears in active list
+    // - is_main_enabled: whether connection is enabled/active on main page
+    const { is_active_assigned, is_main_enabled } = body
 
     await initRedis()
     let connection = await getConnection(connectionId)
     let resolvedId = connectionId
 
-    // Fallback: try with conn- prefix if not found (handles predefined IDs like bybit-x03 → conn-bybit-x03)
+    // Fallback: try with conn- prefix if not found
     if (!connection && !connectionId.startsWith("conn-")) {
       const prefixedId = `conn-${connectionId}`
       console.log(`[v0] [Toggle] Not found with id=${connectionId}, trying conn- prefix: ${prefixedId}`)
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     console.log(`[v0] [Toggle] Toggling ${connection.name} (${connectionId}):`)
-    console.log(`[v0] [Toggle]   Before: is_active_inserted=${connection.is_active_inserted}, is_enabled_dashboard=${connection.is_enabled_dashboard}`)
+    console.log(`[v0] [Toggle]   Before: is_active_assigned=${connection.is_active_assigned}, is_main_enabled=${connection.is_main_enabled}`)
 
     // Build update object with all necessary fields
     const updatedConnection = {
@@ -62,30 +62,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     
     let engineAction: "start" | "stop" | null = null
     
-    if (is_active_inserted !== undefined) {
-      updatedConnection.is_active_inserted = is_active_inserted
-      console.log(`[v0] [Toggle]   Setting is_active_inserted=${is_active_inserted}`)
+    if (is_active_assigned !== undefined) {
+      updatedConnection.is_active_assigned = is_active_assigned
+      console.log(`[v0] [Toggle]   Setting is_active_assigned=${is_active_assigned}`)
     }
     
-    if (is_enabled_dashboard !== undefined) {
-      updatedConnection.is_enabled_dashboard = is_enabled_dashboard
+    if (is_main_enabled !== undefined) {
+      updatedConnection.is_main_enabled = is_main_enabled
       
-      // CRITICAL: When toggling on/off in dashboard, also manage is_enabled + is_inserted for engine filter
-      // getInsertedAndEnabledConnections() requires BOTH is_inserted="1" AND is_enabled="1"
-      if (is_enabled_dashboard) {
+      // CRITICAL: When toggling on/off on main page, also manage is_enabled + is_assigned for engine filter
+      // getAssignedAndEnabledConnections() requires BOTH is_assigned="1" AND is_enabled="1"
+      if (is_main_enabled) {
         // Toggle ON: Set all flags so engine's coordinator finds this connection
         updatedConnection.is_enabled = "1"
-        updatedConnection.is_inserted = "1"
+        updatedConnection.is_assigned = "1"
         updatedConnection.is_active = "1"
         engineAction = "start"
-        console.log(`[v0] [Toggle] ENABLING: is_enabled=1, is_inserted=1 (engine will process this connection)`)
+        console.log(`[v0] [Toggle] ENABLING: is_enabled=1, is_assigned=1 (engine will process this connection)`)
       } else {
         // Toggle OFF: Clear flags so engine stops processing
         updatedConnection.is_enabled = "0"
-        updatedConnection.is_inserted = "0"
+        updatedConnection.is_assigned = "0"
         updatedConnection.is_active = "0"
         engineAction = "stop"
-        console.log(`[v0] [Toggle] DISABLING: is_enabled=0, is_inserted=0 (engine will stop processing)`)
+        console.log(`[v0] [Toggle] DISABLING: is_enabled=0, is_assigned=0 (engine will stop processing)`)
       }
     }
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (engineAction === "start") {
       try {
         // Log progression event for UI feedback
-        await logProgressionEvent(resolvedId, "toggle_enabled", "info", "Connection enabled via dashboard toggle", {
+        await logProgressionEvent(resolvedId, "toggle_enabled", "info", "Connection enabled via main toggle", {
           connectionId: resolvedId,
           connectionName: connection.name,
           exchange: connection.exchange,
@@ -142,10 +142,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             started_at: globalState.started_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
             active_connections: (globalState.active_connections || 0) + 1,
-            refresh_requested: new Date().toISOString(), // Signal coordinator to refresh
+            refresh_requested: new Date().toISOString(),
           })
           
-          // Signal the coordinator to refresh engines by setting a refresh flag
+          // Signal the coordinator to refresh engines
           await setSettings("engine_coordinator:refresh_requested", {
             timestamp: new Date().toISOString(),
             connectionId: resolvedId,
@@ -165,13 +165,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     } else if (engineAction === "stop") {
       try {
-        // Log progression event for UI feedback
-        await logProgressionEvent(resolvedId, "toggle_disabled", "info", "Connection disabled via dashboard toggle", {
+        await logProgressionEvent(resolvedId, "toggle_disabled", "info", "Connection disabled via main toggle", {
           connectionId: resolvedId,
           connectionName: connection.name,
         })
         
-        // Update engine progression phase to show stopped
         await setSettings(`engine_progression:${resolvedId}`, {
           phase: "idle",
           progress: 0,
@@ -211,10 +209,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: resolvedId,
         name: connection.name,
         exchange: connection.exchange,
-        is_active_inserted: updatedConnection.is_active_inserted,
-        is_enabled_dashboard: updatedConnection.is_enabled_dashboard,
+        is_active_assigned: updatedConnection.is_active_assigned,
+        is_main_enabled: updatedConnection.is_main_enabled,
         is_enabled: updatedConnection.is_enabled,
-        is_inserted: updatedConnection.is_inserted,
+        is_assigned: updatedConnection.is_assigned,
       },
       engine: {
         action: engineAction,

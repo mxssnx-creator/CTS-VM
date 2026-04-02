@@ -80,7 +80,7 @@ export async function GET() {
 
     // Check for empty active connections on dashboard (info level)
     const dashboardConnections = connections.filter((c: any) => 
-      c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+      c.is_main_enabled === "1" || c.is_main_enabled === true
     )
     
     if (dashboardConnections.length === 0 && connections.length > 0) {

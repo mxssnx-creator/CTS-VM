@@ -64,10 +64,10 @@ export async function POST(request: Request) {
       api_secret,
       is_testnet: false, // Always mainnet
       is_enabled: "1", // Enable in Settings
-      is_inserted: "1", // Marked as inserted
-      is_active_inserted: "1", // In Active panel
-      is_dashboard_inserted: "1", // Available in dashboard
-      is_enabled_dashboard: "1", // Dashboard toggle ON - START PROCESSING
+      is_assigned: "1", // Marked as inserted
+      is_active_assigned: "1", // In Active panel
+      is_main_assigned: "1", // Available in dashboard
+      is_main_enabled: "1", // Dashboard toggle ON - START PROCESSING
       is_active: "1", // Active status
       is_live_trade: "0", // Live trade still off until explicitly enabled
       updated_at: new Date().toISOString(),
@@ -115,8 +115,8 @@ export async function POST(request: Request) {
         exchange: connection.exchange,
         status: {
           is_enabled: true,
-          is_active_inserted: true,
-          is_enabled_dashboard: true,
+          is_active_assigned: true,
+          is_main_enabled: true,
           hasCredentials: true,
         }
       },
@@ -155,8 +155,8 @@ export async function GET() {
 
     // Find connections ready for processing (all flags set)
     const readyForProcessing = connectionsWithCredentials.filter((c: any) => {
-      const isActiveInserted = c.is_active_inserted === "1" || c.is_active_inserted === true
-      const isDashboardEnabled = c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+      const isActiveInserted = c.is_active_assigned === "1" || c.is_active_assigned === true
+      const isDashboardEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
       return isActiveInserted && isDashboardEnabled
     })
 

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       // Check 3: Connection active on Dashboard
-      const isActive = connection.is_enabled_dashboard === "1" || connection.is_enabled_dashboard === true
+      const isActive = connection.is_main_enabled === "1" || connection.is_main_enabled === true
       console.log(`[v0] [LiveTrade]   - Connection active on Dashboard: ${isActive}`)
       
       if (!isActive) {

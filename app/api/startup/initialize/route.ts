@@ -44,9 +44,9 @@ export async function POST() {
           position_mode: predefined.positionMode || "hedge",
           is_testnet: false,
           is_enabled: true, // BASE connections start ENABLED (not dashboard-active yet)
-          is_dashboard_inserted: shouldBeOnDashboard ? "1" : "0", // Only bybit/bingx on dashboard
-          is_active_inserted: shouldBeOnDashboard ? "1" : "0", // Same as dashboard_inserted
-          is_enabled_dashboard: "0", // Dashboard-active disabled by default
+          is_main_assigned: shouldBeOnDashboard ? "1" : "0", // Only bybit/bingx on dashboard
+          is_active_assigned: shouldBeOnDashboard ? "1" : "0", // Same as dashboard_inserted
+          is_main_enabled: "0", // Dashboard-active disabled by default
           is_predefined: true,
           api_key: predefined.apiKey || "",
           api_secret: predefined.apiSecret || "",
@@ -67,22 +67,22 @@ export async function POST() {
       const shouldBeOnDashboard = DASHBOARD_AUTO_INSERTED.includes(exch)
       
       // CRITICAL: Only enforce dashboard state on FIRST creation
-      // If connection already has is_dashboard_inserted set (even to "0"), respect user's choice
-      const hasExplicitDashboardState = c.is_dashboard_inserted !== undefined && c.is_dashboard_inserted !== null
+      // If connection already has is_main_assigned set (even to "0"), respect user's choice
+      const hasExplicitDashboardState = c.is_main_assigned !== undefined && c.is_main_assigned !== null
       
       // Determine correct dashboard state: only apply to new connections
-      const dashboardInserted = hasExplicitDashboardState ? c.is_dashboard_inserted : (shouldBeOnDashboard ? "1" : "0")
+      const dashboardInserted = hasExplicitDashboardState ? c.is_main_assigned : (shouldBeOnDashboard ? "1" : "0")
       
       // Check if migration needed - ONLY for enabled state, NOT for dashboard state
-      const needsUpdate = c.is_enabled !== true || !c.is_enabled_dashboard
+      const needsUpdate = c.is_enabled !== true || !c.is_main_enabled
       
       if (needsUpdate) {
         await updateConnection(c.id, {
           ...c,
           is_enabled: true, // BASE ENABLED - always ensure enabled in settings
-          is_dashboard_inserted: dashboardInserted, // Dashboard state: respect user's choice
-          is_active_inserted: dashboardInserted, // Same as dashboard_inserted for Active panel
-          is_enabled_dashboard: "0", // Dashboard-active disabled by default - never auto-enable
+          is_main_assigned: dashboardInserted, // Dashboard state: respect user's choice
+          is_active_assigned: dashboardInserted, // Same as dashboard_inserted for Active panel
+          is_main_enabled: "0", // Dashboard-active disabled by default - never auto-enable
           updated_at: new Date().toISOString(),
         })
         results.connectionsMigrated++
@@ -93,7 +93,7 @@ export async function POST() {
         results.enabledCount++
       }
       
-      if (c.is_dashboard_inserted === "1" || c.is_dashboard_inserted === true) {
+      if (c.is_main_assigned === "1" || c.is_main_assigned === true) {
         results.dashboardInsertedCount++
       }
     }

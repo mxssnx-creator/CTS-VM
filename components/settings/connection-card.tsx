@@ -57,7 +57,7 @@ export function ConnectionCard({
   isNewlyAdded = false,
 }: ConnectionCardProps) {
   const exchange = (connection.exchange || "").toLowerCase().trim()
-  const isInserted = connection.is_inserted === "1" || connection.is_inserted === true
+  const isInserted = connection.is_assigned === "1" || connection.is_assigned === true
   const isEnabled = connection.is_enabled === "1" || connection.is_enabled === true || connection.is_enabled === "true"
   const [testingConnection, setTestingConnection] = useState(false)
   const [workingStatus, setWorkingStatus] = useState<"idle" | "testing" | "success" | "error">("idle")

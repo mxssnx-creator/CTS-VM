@@ -1,16 +1,16 @@
 /**
  * CONNECTION HIERARCHY:
  * 1. PREDEFINED TEMPLATES (11 total): All connections seeded by migrations
- * 2. BASE CONNECTIONS (6): Primary exchanges with is_inserted=1, is_enabled=1
- *    - These are the working base connections that appear in Settings and Dashboard
+ * 2. BASE CONNECTIONS (6): Primary exchanges with is_assigned=1, is_enabled=1
+ *    - These are the working base connections that appear in Settings and Main page
  * 3. TEMPLATE-ONLY (5): Secondary exchanges (gateio, kucoin, mexc, bitget, huobi)
  *    - Just informational templates, not active unless user explicitly enables them
- * 4. ACTIVE CONNECTIONS: Connections with is_enabled_dashboard=1
+ * 4. MAIN CONNECTIONS: Connections with is_main_enabled=1
  *    - INDEPENDENT status from Settings is_enabled
- *    - Trade engine processes ONLY active connections
+ *    - Trade engine processes ONLY main connections
  */
 
-// The 6 primary/base exchanges that are "inserted" and enabled by default
+// The 6 primary/base exchanges that are "assigned" and enabled by default
 export const BASE_EXCHANGES = ["bybit", "bingx", "binance", "okx", "pionex", "orangex"]
 
 // All known exchanges (base + templates)
@@ -18,7 +18,7 @@ export const ALL_EXCHANGES = ["bybit", "bingx", "binance", "okx", "pionex", "ora
 
 /**
  * Check if a connection is a BASE connection (one of the 4 primary exchanges)
- * Uses the `exchange` field for reliable matching regardless of is_inserted state
+ * Uses the `exchange` field for reliable matching regardless of is_assigned state
  */
 export function isBaseConnection(connection: any): boolean {
   if (!connection) return false
@@ -51,11 +51,11 @@ export function isConnectionEnabled(connection: any): boolean {
 }
 
 /**
- * Check if a connection is active on the Dashboard
+ * Check if a connection is enabled on the Main page
  */
-export function isConnectionActiveDashboard(connection: any): boolean {
+export function isConnectionMainEnabled(connection: any): boolean {
   if (!connection) return false
-  return connection.is_enabled_dashboard === true || connection.is_enabled_dashboard === "1" || connection.is_enabled_dashboard === "true"
+  return connection.is_main_enabled === true || connection.is_main_enabled === "1" || connection.is_main_enabled === "true"
 }
 
 /**
@@ -73,15 +73,15 @@ export function filterTemplateConnections(connections: any[]): any[] {
 }
 
 /**
- * Filter connections to base connections that are enabled (for Active Connections listing)
+ * Filter connections to base connections that are enabled (for Main Connections listing)
  */
 export function filterEnabledBaseConnections(connections: any[]): any[] {
   return connections.filter(c => isBaseConnection(c) && isConnectionEnabled(c))
 }
 
 /**
- * Filter connections to dashboard-active connections (for trade engine processing)
+ * Filter connections to main-enabled connections (for trade engine processing)
  */
-export function filterDashboardActiveConnections(connections: any[]): any[] {
-  return connections.filter(isConnectionActiveDashboard)
+export function filterMainEnabledConnections(connections: any[]): any[] {
+  return connections.filter(isConnectionMainEnabled)
 }

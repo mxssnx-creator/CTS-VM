@@ -21,7 +21,7 @@ export async function GET() {
     const allConnections = await getAllConnections()
     const enabledConnections = allConnections.filter(c => 
       (c.is_enabled === "1" || c.is_enabled === true) &&
-      (c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true)
+      (c.is_main_enabled === "1" || c.is_main_enabled === true)
     )
     
     // Get main engine config to find how many symbols are configured

@@ -59,15 +59,15 @@ export function AddActiveConnectionDialog({
       // Filter to show base exchange connections that are:
       // 1. Base exchange (bybit, bingx, binance, okx only)
       // 2. Enabled in Settings (is_enabled=1)
-      // 3. Not yet added to Active panel (is_active_inserted=0)
+      // 3. Not yet added to Active panel (is_active_assigned=0)
       // Note: Both predefined templates AND user-created connections can be added
       const BASE_EXCHANGES = ["bybit", "bingx", "pionex", "orangex"]
       const availableForAdd = allConnections.filter((c: any) => {
         const exchange = (c.exchange || "").toLowerCase().trim()
         const isBase = BASE_EXCHANGES.includes(exchange)
         const isEnabled = c.is_enabled === true || c.is_enabled === "1" || c.is_enabled === "true"
-        const alreadyInActivePanel = c.is_active_inserted === true || c.is_active_inserted === "1" ||
-                                      c.is_dashboard_inserted === true || c.is_dashboard_inserted === "1"
+        const alreadyInActivePanel = c.is_active_assigned === true || c.is_active_assigned === "1" ||
+                                      c.is_main_assigned === true || c.is_main_assigned === "1"
         
         // Show base connections that are enabled but NOT yet in Active panel
         return isBase && isEnabled && !alreadyInActivePanel
@@ -100,13 +100,13 @@ export function AddActiveConnectionDialog({
 
     setAdding(true)
     try {
-      // Use API to set is_dashboard_inserted=1 (adds to dashboard) and is_enabled_dashboard=0 (disabled by default)
+      // Use API to set is_main_assigned=1 (adds to dashboard) and is_main_enabled=0 (disabled by default)
       const res = await fetch(`/api/settings/connections/${selectedConnection}/toggle-dashboard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          is_dashboard_inserted: "1",  // Mark as inserted on dashboard
-          is_enabled_dashboard: "0",    // Disabled by default - user must enable
+          is_main_assigned: "1",  // Mark as inserted on dashboard
+          is_main_enabled: "0",    // Disabled by default - user must enable
         }),
       })
       if (!res.ok) {

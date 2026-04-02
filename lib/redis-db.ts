@@ -430,8 +430,8 @@ export async function initRedis(): Promise<void> {
 
   // NOTE: Do NOT initialize user-created connections here
   // Migrations 011-016 already set up all 15 predefined template connections
-  // and mark 4 as "base" (is_inserted=1, is_enabled=1, is_active_inserted=1)
-  // Creating separate "conn-*" connections would create duplicates on dashboard
+  // and mark 4 as "base" (is_assigned=1, is_enabled=1, is_active_assigned=1)
+  // Creating separate "conn-*" connections would create duplicates on main page
   if (!connectionsInitialized) {
     connectionsInitialized = true
     console.log("[v0] [Connections] ✓ Connection initialization skipped (handled by migrations 011-016)")
@@ -669,12 +669,12 @@ export async function verifyRedisHealth(): Promise<{ healthy: boolean; message: 
 export async function getActiveConnectionsForEngine(): Promise<any[]> {
   const allConnections = await getAllConnections()
   // Filter for connections that are:
-  // 1. Active-inserted (in Active panel) AND enabled (is_enabled OR is_enabled_dashboard)
+  // 1. Active-assigned (in Active panel) AND enabled (is_enabled OR is_main_enabled)
   // 2. Either has credentials OR is set to testnet/demo mode
   const filtered = allConnections.filter((c: any) => {
-    const isActiveInserted = c.is_active_inserted === "1" || c.is_active_inserted === true
+    const isActiveAssigned = c.is_active_assigned === "1" || c.is_active_assigned === true
     const isEnabled = c.is_enabled === "1" || c.is_enabled === true
-    const isDashboardEnabled = c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+    const isMainEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
     
     // Check for credentials (from connection OR from environment)
     const apiKey = c.api_key || c.apiKey || ""
@@ -686,7 +686,7 @@ export async function getActiveConnectionsForEngine(): Promise<any[]> {
     const isDemoMode = c.demo_mode === "1" || c.demo_mode === true
     
     // Connection must be in Active panel AND enabled
-    const isReadyForEngine = isActiveInserted && (isEnabled || isDashboardEnabled)
+    const isReadyForEngine = isActiveAssigned && (isEnabled || isMainEnabled)
     
     // AND either have valid credentials OR be in testnet/demo mode
     return isReadyForEngine && (hasCredentials || isTestnet || isDemoMode)
@@ -701,24 +701,29 @@ export async function getEnabledConnections(): Promise<any[]> {
   return allConnections.filter((c: any) => c.is_enabled === "1" || c.is_enabled === true)
 }
 
-export async function getInsertedAndEnabledConnections(): Promise<any[]> {
+export async function getAssignedAndEnabledConnections(): Promise<any[]> {
   const allConnections = await getAllConnections()
   // Return connections that are:
-  // 1. Active-inserted into Active panel (is_active_inserted="1")
+  // 1. Active-assigned into Active panel (is_active_assigned="1")
   // 2. AND active/enabled (is_active="1" OR is_enabled="1")
   // This is the filter used by the trade engine coordinator to find active connections
   return allConnections.filter((c: any) => {
     // Check for active panel flags (modern approach)
-    const isActiveInserted = c.is_active_inserted === "1" || c.is_active_inserted === true
+    const isActiveAssigned = c.is_active_assigned === "1" || c.is_active_assigned === true
     const isActive = c.is_active === "1" || c.is_active === true
     
     // Fall back to old flags if needed
-    const isInserted = c.is_inserted === "1" || c.is_inserted === true
+    const isAssigned = c.is_assigned === "1" || c.is_assigned === true
     const isEnabled = c.is_enabled === "1" || c.is_enabled === true
     
     // Match either set of flags
-    return (isActiveInserted && isActive) || (isInserted && isEnabled)
+    return (isActiveAssigned && isActive) || (isAssigned && isEnabled)
   })
+}
+
+// Backward compatibility alias
+export async function getInsertedAndEnabledConnections(): Promise<any[]> {
+  return getAssignedAndEnabledConnections()
 }
 
 // ========== Stats Operations ==========

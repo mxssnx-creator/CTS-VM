@@ -25,15 +25,15 @@ export async function GET() {
         !!(c.api_key) && c.api_key.length > 10 && !!(c.api_secret) && c.api_secret.length > 10
       ).length,
       inActivePanel: connections.filter((c: any) =>
-        c.is_active_inserted === "1" || c.is_active_inserted === true
+        c.is_active_assigned === "1" || c.is_active_assigned === true
       ).length,
       dashboardEnabled: connections.filter((c: any) =>
-        c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+        c.is_main_enabled === "1" || c.is_main_enabled === true
       ).length,
       readyForProcessing: connections.filter((c: any) => {
         const hasCredentials = !!(c.api_key) && c.api_key.length > 10 && !!(c.api_secret) && c.api_secret.length > 10
-        const isInActivePanel = c.is_active_inserted === "1" || c.is_active_inserted === true
-        const isDashboardEnabled = c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+        const isInActivePanel = c.is_active_assigned === "1" || c.is_active_assigned === true
+        const isDashboardEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
         return hasCredentials && isInActivePanel && isDashboardEnabled
       }).length,
     }
@@ -151,7 +151,7 @@ export async function GET() {
               method: "PUT",
               path: "/api/settings/connections/{id}/toggle-dashboard",
               description: "Enable/disable connection on dashboard (starts engine processing)",
-              effect: "Sets is_enabled_dashboard, triggers engine lifecycle"
+              effect: "Sets is_main_enabled, triggers engine lifecycle"
             },
             addToActive: {
               method: "POST",

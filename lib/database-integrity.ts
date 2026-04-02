@@ -54,7 +54,7 @@ export async function checkDatabaseIntegrity(): Promise<IntegrityReport> {
     for (const conn of connections) {
       if (!conn.id) errors.push(`Connection missing id`)
       if (!conn.exchange) errors.push(`Connection ${conn.id} missing exchange`)
-      if (!conn.is_inserted && !conn.is_predefined) {
+      if (!conn.is_assigned && !conn.is_predefined) {
         errors.push(`Connection ${conn.id} neither inserted nor predefined`)
       }
     }
@@ -104,7 +104,7 @@ export async function checkDatabaseIntegrity(): Promise<IntegrityReport> {
   // Check 4: Active Connections Relationship
   try {
     const connections = await getAllConnections()
-    const activeConnections = connections.filter((c) => c.is_enabled_dashboard === true || c.is_enabled_dashboard === "1")
+    const activeConnections = connections.filter((c) => c.is_main_enabled === true || c.is_main_enabled === "1")
     const errors: string[] = []
     
     for (const conn of activeConnections) {
@@ -173,7 +173,7 @@ export async function checkDatabaseIntegrity(): Promise<IntegrityReport> {
     const connections = await getAllConnections()
     const errors: string[] = []
     
-    for (const conn of connections.filter((c) => c.is_enabled_dashboard)) {
+    for (const conn of connections.filter((c) => c.is_main_enabled)) {
       const settings = await getSettings(`settings:connection:${conn.id}`)
       if (!settings || Object.keys(settings).length === 0) {
         errors.push(`${conn.id} active but missing configuration settings`)
@@ -198,7 +198,7 @@ export async function checkDatabaseIntegrity(): Promise<IntegrityReport> {
   // Check 7: Logs Accessibility
   try {
     const connections = await getAllConnections()
-    const activeConns = connections.filter((c) => c.is_enabled_dashboard)
+    const activeConns = connections.filter((c) => c.is_main_enabled)
     let logsAccessible = 0
     
     for (const conn of activeConns) {

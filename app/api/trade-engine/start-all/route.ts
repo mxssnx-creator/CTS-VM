@@ -31,7 +31,7 @@ export async function GET() {
     // Filter for ONLY connections that are BOTH inserted AND enabled
     // These are the ones displayed in "Active Connections"
     const activeConnections = connections.filter((c: any) => {
-      const isInserted = c.is_inserted === "1" || c.is_inserted === true
+      const isInserted = c.is_assigned === "1" || c.is_assigned === true
       const isEnabled = c.is_enabled === "1" || c.is_enabled === true
       const hasLiveTrade = c.is_live_trade === "1" || c.is_live_trade === true
       return isInserted && isEnabled && hasLiveTrade

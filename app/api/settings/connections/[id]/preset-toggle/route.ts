@@ -7,7 +7,7 @@ import { getGlobalTradeEngineCoordinator } from "@/lib/trade-engine"
 // This controls the PRESET Trade Engine
 // Preset Engine starts ONLY if:
 // 1. Connection is enabled (is_enabled = true)
-// 2. Connection is active on dashboard (is_enabled_dashboard = true)
+// 2. Connection is active on dashboard (is_main_enabled = true)
 // 3. Preset Trade toggle is enabled (is_preset_trade = true)
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Check if connection is enabled AND active on dashboard
     const isEnabled = connection.is_enabled === "1" || connection.is_enabled === true
-    const isActive = connection.is_enabled_dashboard === "1" || connection.is_enabled_dashboard === true
+    const isActive = connection.is_main_enabled === "1" || connection.is_main_enabled === true
 
     if (!isEnabled) {
       return NextResponse.json({ error: "Connection must be enabled first" }, { status: 400 })

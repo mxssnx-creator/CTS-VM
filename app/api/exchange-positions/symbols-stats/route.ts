@@ -8,7 +8,7 @@ export async function GET() {
     await initRedis()
     const connections = await getAllConnections()
     const activeConnections = connections.filter(c => 
-      (c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true) &&
+      (c.is_main_enabled === "1" || c.is_main_enabled === true) &&
       (c.is_enabled === "1" || c.is_enabled === true)
     )
 

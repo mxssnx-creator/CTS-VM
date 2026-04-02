@@ -48,10 +48,10 @@ export async function GET() {
           !!(c.api_key) && c.api_key.length > 10 && !!(c.api_secret) && c.api_secret.length > 10
         ).length,
         inActivePanel: allConnections.filter((c: any) => 
-          c.is_active_inserted === "1" || c.is_active_inserted === true
+          c.is_active_assigned === "1" || c.is_active_assigned === true
         ).length,
         dashboardEnabled: allConnections.filter((c: any) => 
-          c.is_enabled_dashboard === "1" || c.is_enabled_dashboard === true
+          c.is_main_enabled === "1" || c.is_main_enabled === true
         ).length,
       }
       
@@ -99,8 +99,8 @@ export async function GET() {
             name: conn.name,
             exchange: conn.exchange,
             status: connectionRunning ? "running" : "stopped",
-            enabled: conn.is_enabled_dashboard === true || conn.is_enabled_dashboard === "1",
-            activelyUsing: conn.is_enabled_dashboard === true || conn.is_enabled_dashboard === "1",
+            enabled: conn.is_main_enabled === true || conn.is_main_enabled === "1",
+            activelyUsing: conn.is_main_enabled === true || conn.is_main_enabled === "1",
             positions: positionsCount,
             trades: tradesCount,
             progression: {

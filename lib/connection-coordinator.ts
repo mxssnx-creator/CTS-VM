@@ -27,7 +27,7 @@ export interface Connection {
   position_mode: string
   is_testnet: boolean
   is_enabled: boolean
-  is_enabled_dashboard: boolean
+  is_main_enabled: boolean
   is_active: boolean
   is_predefined: boolean
 }
@@ -155,16 +155,16 @@ export class ConnectionCoordinator {
   /**
    * Check if a connection has valid (non-placeholder) API credentials.
    * Predefined connections are ALWAYS considered invalid for API calls
-   * unless they have been explicitly inserted by the user.
+   * unless they have been explicitly assigned by the user.
    */
   private hasValidCredentials(conn: any): boolean {
     // Predefined connections never have real API keys - always skip
     const isPredefined = conn.is_predefined === true || conn.is_predefined === "true" || conn.is_predefined === "1" || conn.is_predefined === 1
     if (isPredefined) return false
 
-    // Must be explicitly inserted by the user
-    const isInserted = conn.is_inserted === true || conn.is_inserted === "true" || conn.is_inserted === "1" || conn.is_inserted === 1
-    if (!isInserted) return false
+    // Must be explicitly assigned by the user
+    const isAssigned = conn.is_assigned === true || conn.is_assigned === "true" || conn.is_assigned === "1" || conn.is_assigned === 1
+    if (!isAssigned) return false
 
     const key = conn.api_key
     if (!key || key === "" || key.length < 16) return false
@@ -174,7 +174,7 @@ export class ConnectionCoordinator {
 
   /**
    * Perform health checks on all active connections
-   * Only checks connections that are inserted, enabled, AND have valid API credentials
+   * Only checks connections that are assigned, enabled, AND have valid API credentials
    */
   private async performHealthChecks(): Promise<void> {
     const eligible = Array.from(this.connections.values())
@@ -411,4 +411,4 @@ export class ConnectionCoordinator {
   }
 }
 
-export type { Connection }
+export {}

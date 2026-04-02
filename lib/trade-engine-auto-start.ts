@@ -52,10 +52,10 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
     }
 
     // Filter for connections that are ACTIVE-INSERTED (in Active panel) with valid credentials
-    // is_active_inserted=1 means they're added to the Active panel by user
+    // is_active_assigned=1 means they're added to the Active panel by user
     // This is the ONLY requirement to start engines (not is_enabled)
     const enabledConnections = connections.filter((c) => {
-      const isActiveInserted = c.is_active_inserted === true || c.is_active_inserted === "true" || c.is_active_inserted === "1"
+      const isActiveInserted = c.is_active_assigned === true || c.is_active_assigned === "true" || c.is_active_assigned === "1"
       const hasValidKey = c.api_key && c.api_key.length >= 20 && !c.api_key.includes("PLACEHOLDER")
       return isActiveInserted && hasValidKey
     })
