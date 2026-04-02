@@ -10,10 +10,7 @@ import { SystemInitializer } from "@/components/system-initializer"
 import { Toaster } from "@/components/ui/sonner"
 import { initializeConsoleLogger } from "@/lib/console-logger"
 
-// Initialize console logger to capture all [v0] logs
 initializeConsoleLogger()
-
-export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "CTS v3 - Crypto Trading System",
