@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSettings } from "@/lib/redis-persistence"
+import { getSettings } from "@/lib/redis-db"
 import { getGlobalTradeEngineCoordinator } from "@/lib/trade-engine"
 import { loadConnections } from "@/lib/file-storage"
 import { getConnectionTrades, getConnectionPositions, getIndications, getRedisClient } from "@/lib/redis-db"

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSettings } from "@/lib/redis-persistence"
+import { getSettings } from "@/lib/redis-db"
 
 /**
  * Comprehensive engine progression status
