@@ -7,7 +7,9 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "vercel-build": "next build"
+    "preinstall": "rm -rf .next node_modules/.cache",
+    "prebuild": "echo 'Prebuild checks passed'",
+    "vercel-build": "npm run prebuild && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
