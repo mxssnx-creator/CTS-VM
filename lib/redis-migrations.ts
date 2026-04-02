@@ -591,6 +591,57 @@ const migrations: Migration[] = [
       await client.set("_schema_version", "15")
     },
   },
+  {
+    name: "017-rename-old-connection-fields",
+    version: 17,
+    up: async (client: any) => {
+      await client.set("_schema_version", "17")
+
+      // Field name mappings: old -> new
+      const fieldMappings: Record<string, string> = {
+        is_enabled_dashboard: "is_main_enabled",
+        is_active_inserted: "is_active_assigned",
+        is_inserted: "is_assigned",
+        is_dashboard_inserted: "is_main_assigned",
+      }
+
+      const connections = await client.smembers("connections") || []
+      let renamed = 0
+
+      for (const connId of connections) {
+        const connData = await client.hgetall(`connection:${connId}`)
+        if (!connData || Object.keys(connData).length === 0) continue
+
+        const updates: Record<string, string> = {}
+        const fieldsToDelete: string[] = []
+
+        for (const [oldField, newField] of Object.entries(fieldMappings)) {
+          if (connData[oldField] !== undefined && connData[oldField] !== null) {
+            // Only copy if new field doesn't already have a value
+            if (!connData[newField]) {
+              updates[newField] = connData[oldField]
+            }
+            fieldsToDelete.push(oldField)
+            renamed++
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await client.hset(`connection:${connId}`, updates)
+        }
+
+        // Delete old fields
+        for (const field of fieldsToDelete) {
+          await client.hdel(`connection:${connId}`, field)
+        }
+      }
+
+      console.log(`[v0] Migration 017: Renamed ${renamed} old fields to new names across ${connections.length} connections`)
+    },
+    down: async (client: any) => {
+      await client.set("_schema_version", "16")
+    },
+  },
 ]
 
 /**

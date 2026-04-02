@@ -472,6 +472,37 @@ function flattenForHmset(obj: Record<string, string>): string[] {
 
 // ========== Connection Operations ==========
 
+/**
+ * Normalize connection field names for backward compatibility.
+ * Maps old field names (dashboard/inserted) to new names (main/assigned).
+ * This ensures all downstream code works regardless of which field names exist in Redis.
+ */
+function normalizeConnectionFields(data: Record<string, string>): Record<string, string> {
+  if (!data) return data
+  const normalized = { ...data }
+
+  // Field name mappings: old -> new
+  const fieldMappings: Record<string, string> = {
+    is_enabled_dashboard: "is_main_enabled",
+    is_active_inserted: "is_active_assigned",
+    is_inserted: "is_assigned",
+    is_dashboard_inserted: "is_main_assigned",
+  }
+
+  for (const [oldField, newField] of Object.entries(fieldMappings)) {
+    // If old field exists and new field doesn't, copy value to new field
+    if (normalized[oldField] !== undefined && normalized[oldField] !== null && normalized[oldField] !== "") {
+      if (!normalized[newField]) {
+        normalized[newField] = normalized[oldField]
+      }
+      // Delete old field to keep data clean
+      delete normalized[oldField]
+    }
+  }
+
+  return normalized
+}
+
 export async function getAllConnections(): Promise<any[]> {
   const client = getClient()
   const connIds = await client.smembers("connections")
@@ -485,7 +516,7 @@ export async function getAllConnections(): Promise<any[]> {
   for (const id of connIds) {
     const data = await client.hgetall(`connection:${id}`)
     if (data && Object.keys(data).length > 0) {
-      connections.push(data)
+      connections.push(normalizeConnectionFields(data))
     }
   }
 
@@ -495,7 +526,10 @@ export async function getAllConnections(): Promise<any[]> {
 export async function getConnection(id: string): Promise<any | null> {
   const client = getClient()
   const data = await client.hgetall(`connection:${id}`)
-  return data && Object.keys(data).length > 0 ? data : null
+  if (data && Object.keys(data).length > 0) {
+    return normalizeConnectionFields(data)
+  }
+  return null
 }
 
 export async function createConnection(data: Record<string, any>): Promise<void> {
