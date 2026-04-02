@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
 import { initRedis, getAllConnections, getRedisClient } from "@/lib/redis-db"
+import { SystemLogger } from "@/lib/system-logger"
 
 export async function GET() {
   try {
+    console.log("[v0] [StrategiesEvaluation] Fetching strategies evaluation")
     await initRedis()
     const client = getRedisClient()
 
     // Get strategies from Redis keys: strategies:{connectionId}:{symbol}
     const strategyKeys = await client.keys("strategies:*")
+    console.log(`[v0] [StrategiesEvaluation] Found ${strategyKeys.length} strategy keys`)
     
     const strategyStats = {
       base: { count: 0, winRate: 0, drawdown: 0, drawdownHours: 0, profitFactor250: 0, profitFactor50: 0, strategies: [] as any[] },
@@ -18,17 +21,24 @@ export async function GET() {
 
     // Fetch all strategies
     for (const key of strategyKeys) {
-      const strategy = await client.get(key)
-      if (!strategy) continue
+      try {
+        const strategy = await client.get(key)
+        if (!strategy) continue
 
-      const data = JSON.parse(strategy)
-      const mainType = data.mainType as "base" | "main" | "real" | "live"
+        const data = JSON.parse(strategy)
+        const mainType = data.mainType as "base" | "main" | "real" | "live"
 
-      if (strategyStats[mainType]) {
-        strategyStats[mainType].strategies.push(data)
-        strategyStats[mainType].count++
+        if (strategyStats[mainType]) {
+          strategyStats[mainType].strategies.push(data)
+          strategyStats[mainType].count++
+        }
+      } catch (parseError) {
+        console.warn(`[v0] [StrategiesEvaluation] Failed to parse strategy ${key}:`, parseError)
+        continue
       }
     }
+
+    console.log(`[v0] [StrategiesEvaluation] Strategies breakdown - base: ${strategyStats.base.count}, main: ${strategyStats.main.count}, real: ${strategyStats.real.count}, live: ${strategyStats.live.count}`)
 
     // Calculate aggregates for each strategy type
     Object.keys(strategyStats).forEach((type) => {
@@ -51,12 +61,21 @@ export async function GET() {
       delete (stats as any).strategies
     })
 
+    await SystemLogger.logToDatabase({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      category: "strategies_evaluation",
+      message: `Strategies evaluated: base=${strategyStats.base.count}, main=${strategyStats.main.count}, real=${strategyStats.real.count}, live=${strategyStats.live.count}`,
+      metadata: strategyStats,
+    })
+
     return NextResponse.json({
       success: true,
       strategies: strategyStats,
     })
   } catch (error) {
-    console.error("[v0] Failed to fetch strategies stats:", error)
+    console.error("[v0] [StrategiesEvaluation] Failed to fetch strategies stats:", error)
+    await SystemLogger.logError("strategies_evaluation", error, { operation: "GET /api/dashboard/strategies-evaluation" })
     return NextResponse.json({
       success: false,
       error: "Failed to fetch strategies stats",

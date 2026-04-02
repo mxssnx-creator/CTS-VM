@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getRedisClient } from "@/lib/redis-db"
+import { SystemLogger } from "@/lib/system-logger"
 
 interface PositionData {
   id: string
@@ -118,8 +119,9 @@ function computeStats(positions: PositionData[]) {
 
 export async function GET() {
   try {
-    console.log("[v0] Fetching detailed trading statistics")
+    console.log("[v0] [TradingStats] Fetching detailed trading statistics")
     const allPositions = await getAllPseudoPositions()
+    console.log(`[v0] [TradingStats] Retrieved ${allPositions.length} positions`)
 
     // Sort by timestamp descending (most recent first)
     allPositions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
@@ -135,6 +137,25 @@ export async function GET() {
     const last32h = computeStats(last32hPositions)
     // Note: last32h stats only include total, totalProfit, profitFactor (ignore wins/losses per original)
     // Original query returned total, totalProfit, profitFactor
+
+    console.log(`[v0] [TradingStats] Last 250: ${last250.total} positions, PF: ${last250.profitFactor.toFixed(2)}`)
+    console.log(`[v0] [TradingStats] Last 50: ${last50.total} positions, PF: ${last50.profitFactor.toFixed(2)}`)
+    console.log(`[v0] [TradingStats] Last 32h: ${last32h.total} positions, PF: ${last32h.profitFactor.toFixed(2)}`)
+
+    await SystemLogger.logToDatabase({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      category: "trading_stats",
+      message: `Stats fetched: ${allPositions.length} positions, PF250: ${last250.profitFactor.toFixed(2)}`,
+      metadata: { 
+        totalPositions: allPositions.length,
+        last250: last250.total,
+        last50: last50.total,
+        last32h: last32h.total,
+        profitFactor250: last250.profitFactor,
+        profitFactor50: last50.profitFactor,
+      },
+    })
 
     return NextResponse.json({
       last250: {
@@ -160,7 +181,13 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error("[v0] Failed to fetch stats:", error)
-    return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 })
+    console.error("[v0] [TradingStats] Failed to fetch stats:", error)
+    await SystemLogger.logError("trading_stats", error, { operation: "GET /api/trading/stats" })
+    return NextResponse.json({ 
+      error: "Failed to fetch stats",
+      last250: { total: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, totalProfit: 0 },
+      last50: { total: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, totalProfit: 0 },
+      last32h: { total: 0, totalProfit: 0, profitFactor: 0 },
+    }, { status: 200 }) // Return 200 with empty data for graceful degradation
   }
 }
