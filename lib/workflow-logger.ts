@@ -63,22 +63,9 @@ export class WorkflowLogger {
       }
 
       const logKey = `workflow_logs:${connectionId}`
-      const logsJson = JSON.stringify(logEntry)
-
-      let workflowLogs: string[] = []
-      
-      const existing = await client.get(logKey)
-      if (existing) {
-        try { workflowLogs = JSON.parse(existing) } catch { workflowLogs = [] }
-      }
-      
-      workflowLogs.unshift(logsJson)
-      
-      if (workflowLogs.length > MAX_LOGS_PER_CONNECTION) {
-        workflowLogs = workflowLogs.slice(0, MAX_LOGS_PER_CONNECTION)
-      }
-      
-      await client.set(logKey, JSON.stringify(workflowLogs), { EX: LOG_TTL_SECONDS })
+      await client.lpush(logKey, JSON.stringify(logEntry))
+      await client.ltrim(logKey, 0, MAX_LOGS_PER_CONNECTION - 1)
+      await client.expire(logKey, LOG_TTL_SECONDS)
     } catch (error) {
       console.error("[v0] [WorkflowLogger] Error logging event:", error)
     }
@@ -94,21 +81,18 @@ export class WorkflowLogger {
       const client = getRedisClient()
 
       const logKey = `workflow_logs:${connectionId}`
-      const existing = await client.get(logKey)
-      if (!existing) return []
+      const rawLogs = await client.lrange(logKey, 0, limit - 1)
+      if (!rawLogs || rawLogs.length === 0) return []
 
-      let logs: WorkflowLogEntry[] = []
-      try {
-        logs = JSON.parse(existing)
-      } catch {
-        return []
-      }
+      let logs: WorkflowLogEntry[] = rawLogs.map((log: string) =>
+        JSON.parse(log)
+      )
 
       if (eventType) {
-        logs = logs.filter((log) => log.eventType === eventType)
+        logs = logs.filter((log: WorkflowLogEntry) => log.eventType === eventType)
       }
 
-      return logs.slice(0, limit)
+      return logs
     } catch (error) {
       console.error("[v0] [WorkflowLogger] Error retrieving logs:", error)
       return []

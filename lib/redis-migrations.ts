@@ -646,12 +646,11 @@ const migrations: Migration[] = [
  */
 export async function runMigrations(): Promise<{ success: boolean; message: string; version: number }> {
   try {
-    // Check if migrations have already run in this process
-  if (haveMigrationsRun()) {
-  const finalVer = Math.max(...migrations.map((m) => m.version))
-  console.log("[v0] [Migrations] ✓ Already executed in this process, skipping")
-  return { success: true, message: "Already run in this process", version: finalVer }
-  }
+    if (await haveMigrationsRun()) {
+      const finalVer = Math.max(...migrations.map((m) => m.version))
+      console.log("[v0] [Migrations] ✓ Already executed in this process, skipping")
+      return { success: true, message: "Already run in this process", version: finalVer }
+    }
 
     await initRedis()
     const client = getRedisClient()

@@ -117,6 +117,9 @@ export class InlineLocalRedis {
     this.data.sets.delete(key)
     this.data.lists.delete(key)
     this.data.sorted_sets.delete(key)
+    if (this.data.ttl) {
+      this.data.ttl.delete(key)
+    }
   }
   
   /**
@@ -185,11 +188,12 @@ export class InlineLocalRedis {
     this.trackOperation()
     let count = 0
     for (const key of keys) {
-      if (this.data.strings.delete(key)) count++
-      else if (this.data.hashes.delete(key)) count++
-      else if (this.data.sets.delete(key)) count++
-      else if (this.data.lists.delete(key)) count++
-      else if (this.data.sorted_sets.delete(key)) count++
+      if (this.data.strings.delete(key) || this.data.hashes.delete(key) || this.data.sets.delete(key) || this.data.lists.delete(key) || this.data.sorted_sets.delete(key)) {
+        count++
+        if (this.data.ttl) {
+          this.data.ttl.delete(key)
+        }
+      }
     }
     return count
   }
@@ -252,6 +256,11 @@ export class InlineLocalRedis {
     this.trackOperation()
     const hash = this.data.hashes.get(key) || {}
     const currentValue = parseInt(hash[field] || "0", 10)
+    if (isNaN(currentValue)) {
+      hash[field] = String(increment)
+      this.data.hashes.set(key, hash)
+      return increment
+    }
     const newValue = currentValue + increment
     hash[field] = String(newValue)
     this.data.hashes.set(key, hash)
@@ -262,6 +271,11 @@ export class InlineLocalRedis {
     this.trackOperation()
     const hash = this.data.hashes.get(key) || {}
     const currentValue = parseFloat(hash[field] || "0")
+    if (isNaN(currentValue)) {
+      hash[field] = String(increment)
+      this.data.hashes.set(key, hash)
+      return increment
+    }
     const newValue = currentValue + increment
     hash[field] = String(newValue)
     this.data.hashes.set(key, hash)
@@ -616,7 +630,7 @@ export async function getSettings(key: string): Promise<any | null> {
 export async function saveMarketData(symbol: string, data: any): Promise<void> {
   const client = getClient()
   const key = `market_data:${symbol}`
-  await client.set(key, JSON.stringify(data))
+  await client.set(key, JSON.stringify(data), { EX: 86400 })
 }
 
 export async function getMarketData(symbol: string): Promise<any | null> {
@@ -637,9 +651,14 @@ export async function setMigrationsRun(): Promise<void> {
   await client.set("_migrations_run", "true")
 }
 
-export function haveMigrationsRun(): boolean {
-  // Check process memory
-  return (global as any).__migrations_run === true
+export async function haveMigrationsRun(): Promise<boolean> {
+  try {
+    const client = getClient()
+    const value = await client.get("_migrations_run")
+    return value === "true"
+  } catch {
+    return false
+  }
 }
 
 // ========== Aliases for backward compatibility ==========
@@ -694,13 +713,10 @@ export async function saveIndication(connectionId: string, indication: any): Pro
 export async function getRedisStats(): Promise<any> {
   const client = getClient()
   const size = await client.dbSize()
-  const allKeys = await client.keys("*").catch(() => [])
-  const keyCount = Array.isArray(allKeys) ? allKeys.length : size
   return {
     connected: isConnected,
     dbSize: size,
-    keyCount: keyCount,
-    total_keys: keyCount,
+    total_keys: size,
     uptimeSeconds: process.uptime(),
     uptime_seconds: process.uptime(),
     memory_used: "N/A",
@@ -708,13 +724,11 @@ export async function getRedisStats(): Promise<any> {
 }
 
 export function getRedisRequestsPerSecond(): number {
-  // Get the accurate requests per second from tracking
   const globalData = globalThis as unknown as { __redis_data?: RedisData }
   if (!globalData.__redis_data?.requestStats) return 0
   
-  // Return the operations from the last completed second
   const rps = globalData.__redis_data.requestStats.operationsPerSecond
-  return Math.max(1, rps) // At least 1 RPS if system is active
+  return rps
 }
 
 export async function verifyRedisHealth(): Promise<{ healthy: boolean; message: string }> {
