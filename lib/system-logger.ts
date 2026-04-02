@@ -8,6 +8,10 @@ interface LogEntry {
   metadata?: Record<string, any>
 }
 
+const LOG_TTL_SECONDS = 604800 // 7 days
+const MAX_CONNECTION_LOGS = 1000
+const MAX_CATEGORY_LOGS = 5000
+
 export class SystemLogger {
   static async logToDatabase(entry: LogEntry): Promise<void> {
     try {
@@ -24,25 +28,24 @@ export class SystemLogger {
         metadata: entry.metadata ? JSON.stringify(entry.metadata) : "",
       }
 
-      // Store log entry using lowercase hset (pass object directly)
       await client.hset(logKey, logEntry)
 
-      // Add to logs index set
       await client.sadd("logs:all", logId)
+      await client.expire("logs:all", LOG_TTL_SECONDS)
 
-      // Add to category index
-      await client.sadd(`logs:${entry.category}`, logId)
+      const categoryKey = `logs:${entry.category}`
+      await client.sadd(categoryKey, logId)
+      await client.expire(categoryKey, LOG_TTL_SECONDS)
 
-      // If this log is associated with a connection, add to connection-specific list
       if (entry.metadata?.connectionId) {
         const connectionId = entry.metadata.connectionId
-        await client.lpush(`logs:connection:${connectionId}`, logId)
-        // Trim list to keep only the most recent 1000 logs per connection
-        await client.ltrim(`logs:connection:${connectionId}`, 0, 999)
+        const connLogKey = `logs:connection:${connectionId}`
+        await client.lpush(connLogKey, logId)
+        await client.ltrim(connLogKey, 0, MAX_CONNECTION_LOGS - 1)
+        await client.expire(connLogKey, LOG_TTL_SECONDS)
       }
 
-      // Set TTL for logs (7 days = 604800 seconds)
-      await client.expire(logKey, 604800)
+      await client.expire(logKey, LOG_TTL_SECONDS)
     } catch (error) {
       console.error("[SystemLogger] Failed to log to database:", error)
     }
@@ -127,8 +130,11 @@ export class SystemLogger {
       const key = category ? `logs:${category}` : "logs:all"
       const logIds = (await client.smembers(key)) || []
 
+      const recentIds = logIds.slice(-limit)
+      if (recentIds.length === 0) return []
+
       const logs: LogEntry[] = []
-      for (const logId of logIds.slice(-limit)) {
+      for (const logId of recentIds) {
         const logData = await client.hgetall(logId)
         if (logData && Object.keys(logData).length > 0) {
           logs.push({
@@ -161,6 +167,16 @@ export class SystemLogger {
       console.log(`[SystemLogger] Cleared logs for category: ${category || "all"}`)
     } catch (error) {
       console.error("[SystemLogger] Failed to clear logs:", error)
+    }
+  }
+
+  static async getLogCount(category?: string): Promise<number> {
+    try {
+      const client = getRedisClient()
+      const key = category ? `logs:${category}` : "logs:all"
+      return await client.scard(key)
+    } catch {
+      return 0
     }
   }
 }

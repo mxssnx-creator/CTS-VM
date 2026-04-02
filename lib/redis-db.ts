@@ -58,14 +58,16 @@ export class InlineLocalRedis {
    * Start periodic TTL cleanup to remove expired keys
    */
   private startTTLCleanup(): void {
-    // Only start once per process
-    const globalCleanup = globalThis as unknown as { __redis_cleanup_started?: boolean }
-    if (globalCleanup.__redis_cleanup_started) return
-    globalCleanup.__redis_cleanup_started = true
+    const globalCleanup = globalThis as unknown as { __redis_cleanup_timer?: ReturnType<typeof setInterval> }
+    if (globalCleanup.__redis_cleanup_timer) return
     
-    setInterval(() => {
+    globalCleanup.__redis_cleanup_timer = setInterval(() => {
       this.cleanupExpiredKeys()
-    }, 60000) // Every 60 seconds
+    }, 60000)
+    
+    if (typeof globalCleanup.__redis_cleanup_timer.unref === 'function') {
+      (globalCleanup.__redis_cleanup_timer as any).unref()
+    }
   }
   
   /**
@@ -304,7 +306,6 @@ export class InlineLocalRedis {
 
   async expire(key: string, seconds: number): Promise<number> {
     this.trackOperation()
-    // Check if key exists in any data structure
     const exists = this.data.strings.has(key) || 
                    this.data.hashes.has(key) || 
                    this.data.sets.has(key) ||
@@ -314,6 +315,34 @@ export class InlineLocalRedis {
       this.setKeyTTL(key, seconds)
       return 1
     }
+    return 0
+  }
+
+  async ttl(key: string): Promise<number> {
+    this.trackOperation()
+    const ttlMap = this.data.ttl
+    if (!ttlMap) return -1
+    const expireAt = ttlMap.get(key)
+    if (!expireAt) return -1
+    if (this.isExpired(key)) return -2
+    return Math.ceil((expireAt - Date.now()) / 1000)
+  }
+
+  async pttl(key: string): Promise<number> {
+    this.trackOperation()
+    const ttlMap = this.data.ttl
+    if (!ttlMap) return -1
+    const expireAt = ttlMap.get(key)
+    if (!expireAt) return -1
+    if (this.isExpired(key)) return -2
+    return Math.max(0, expireAt - Date.now())
+  }
+
+  async persist(key: string): Promise<number> {
+    this.trackOperation()
+    const ttlMap = this.data.ttl
+    if (!ttlMap) return 0
+    if (ttlMap.delete(key)) return 1
     return 0
   }
 
@@ -544,6 +573,7 @@ export async function createConnection(data: Record<string, any>): Promise<void>
 
   await client.hset(`connection:${id}`, flattened)
   await client.sadd("connections", id)
+  await client.expire("connections", 2592000)
 }
 
 export async function updateConnection(id: string, updates: Record<string, any>): Promise<void> {
@@ -657,9 +687,8 @@ export async function saveIndication(connectionId: string, indication: any): Pro
   const client = getClient()
   const existing = await getIndications(connectionId)
   existing.push(indication)
-  // Keep last 1000 indications
   const trimmed = existing.slice(-1000)
-  await client.set(`indications:${connectionId}`, JSON.stringify(trimmed))
+  await client.set(`indications:${connectionId}`, JSON.stringify(trimmed), { EX: 604800 })
 }
 
 export async function getRedisStats(): Promise<any> {
@@ -777,7 +806,9 @@ export async function createPosition(data: Record<string, any>): Promise<void> {
     flattened[k] = convertToString(v)
   }
   await client.hset(`position:${id}`, flattened)
+  await client.expire(`position:${id}`, 604800)
   await client.sadd("positions", id)
+  await client.expire("positions", 2592000)
 }
 
 export async function getPosition(id: string): Promise<any | null> {
@@ -793,6 +824,7 @@ export async function updatePosition(id: string, updates: Record<string, any>): 
     flattened[k] = convertToString(v)
   }
   await client.hset(`position:${id}`, flattened)
+  await client.expire(`position:${id}`, 604800)
 }
 
 export async function deletePosition(id: string): Promise<void> {
@@ -824,7 +856,9 @@ export async function createTrade(data: Record<string, any>): Promise<void> {
     flattened[k] = convertToString(v)
   }
   await client.hset(`trade:${id}`, flattened)
+  await client.expire(`trade:${id}`, 604800)
   await client.sadd("trades", id)
+  await client.expire("trades", 2592000)
 }
 
 export async function getTrade(id: string): Promise<any | null> {
@@ -840,6 +874,7 @@ export async function updateTrade(id: string, updates: Record<string, any>): Pro
     flattened[k] = convertToString(v)
   }
   await client.hset(`trade:${id}`, flattened)
+  await client.expire(`trade:${id}`, 604800)
 }
 
 export async function getConnectionTrades(connectionId: string): Promise<any[]> {

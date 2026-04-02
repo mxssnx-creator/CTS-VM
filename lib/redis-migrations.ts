@@ -81,11 +81,8 @@ const migrations: Migration[] = [
         total_positions: "0", total_open_positions: "0", total_closed_positions: "0",
         total_contracts: "0", total_collateral: "0", total_pnl: "0", avg_leverage: "0",
       })
-      await client.set("trades:counter:open", "0")
-      await client.set("trades:counter:closed", "0")
-      await client.set("trades:counter:pending", "0")
-      await client.set("positions:counter:open", "0")
-      await client.set("positions:counter:closed", "0")
+      await client.expire("trades:metadata", 2592000)
+      await client.expire("positions:metadata", 2592000)
       console.log("[v0] Migration 003: Trade and position schemas created")
     },
     down: async (client: any) => {
@@ -166,9 +163,9 @@ const migrations: Migration[] = [
         avg_response_time: "0", trades_per_minute: "0",
         api_calls_per_minute: "0", errors_per_hour: "0",
       })
-      await client.set("logs:system:counter", "0")
-      await client.set("logs:trades:counter", "0")
-      await client.set("logs:errors:counter", "0")
+      await client.expire("monitoring:metadata", 2592000)
+      await client.expire("system:health", 2592000)
+      await client.expire("system:performance", 2592000)
       console.log("[v0] Migration 006: Monitoring and logging system created")
     },
     down: async (client: any) => {
@@ -708,7 +705,7 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
         console.log(`[v0] [Migrations] ✓ Injected credentials for ${credentialsInjected} connections`)
       }
       
-      setMigrationsRun(true)
+      setMigrationsRun()
       return { success: true, message: `Already at latest version ${finalVersion}`, version: finalVersion }
     }
 
@@ -776,7 +773,7 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     console.log(`[v0] [Migrations] ✓ Auto-fixed ${baseConnections.length} base connections`)
     
     // Mark migrations as run in this process
-    setMigrationsRun(true)
+    setMigrationsRun()
     
     return { success: true, message: `Migrated from v${currentVersion} to v${finalVersion}`, version: finalVersion }
   } catch (error) {

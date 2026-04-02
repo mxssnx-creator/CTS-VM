@@ -1,6 +1,17 @@
 import { getRedisClient } from "./redis-db"
 
-// ========== Connections ==========
+const TTL = {
+  CONNECTION: 0,
+  TRADE: 604800,
+  POSITION: 604800,
+  CACHE_DEFAULT: 300,
+  MONITORING_EVENT: 2592000,
+  SNAPSHOT: 2592000,
+  PRESET: 0,
+  PRESET_TYPE: 0,
+  INDEX_SET: 2592000,
+} as const
+
 export const RedisConnections = {
   async createConnection(conn: any) {
     const client = getRedisClient()
@@ -21,6 +32,7 @@ export const RedisConnections = {
     }
     await client.hmset(key, ...args)
     await client.sadd("connections:all", conn.id)
+    if (TTL.INDEX_SET > 0) await client.expire("connections:all", TTL.INDEX_SET)
     return conn
   },
 
@@ -63,14 +75,16 @@ export const RedisConnections = {
   },
 }
 
-// ========== Trades ==========
 export const RedisTrades = {
   async createTrade(connId: string, trade: any) {
     const client = getRedisClient()
     const key = `trade:${trade.id}`
     await client.hset(key, trade)
+    await client.expire(key, TTL.TRADE)
     await client.sadd(`trades:${connId}`, trade.id)
+    await client.expire(`trades:${connId}`, TTL.INDEX_SET)
     await client.sadd("trades:all", trade.id)
+    await client.expire("trades:all", TTL.INDEX_SET)
     return trade
   },
 
@@ -91,14 +105,16 @@ export const RedisTrades = {
   },
 }
 
-// ========== Positions ==========
 export const RedisPositions = {
   async createPosition(connId: string, pos: any) {
     const client = getRedisClient()
     const key = `position:${pos.id}`
     await client.hset(key, pos)
+    await client.expire(key, TTL.POSITION)
     await client.sadd(`positions:${connId}`, pos.id)
+    await client.expire(`positions:${connId}`, TTL.INDEX_SET)
     await client.sadd("positions:all", pos.id)
+    await client.expire("positions:all", TTL.INDEX_SET)
     return pos
   },
 
@@ -126,6 +142,7 @@ export const RedisPositions = {
 
     const updatedData = { ...existing, ...updates }
     await client.hset(key, updatedData)
+    await client.expire(key, TTL.POSITION)
     return updatedData
   },
 
@@ -140,12 +157,12 @@ export const RedisPositions = {
   },
 }
 
-// ========== Cache ==========
 export const RedisCache = {
   async set(key: string, value: any, ttl?: number) {
     const client = getRedisClient()
-    await client.set(`cache:${key}`, JSON.stringify(value))
-    if (ttl) await client.expire(`cache:${key}`, ttl)
+    const cacheKey = `cache:${key}`
+    const effectiveTtl = ttl || TTL.CACHE_DEFAULT
+    await client.set(cacheKey, JSON.stringify(value), { EX: effectiveTtl })
   },
 
   async get(key: string) {
@@ -155,7 +172,6 @@ export const RedisCache = {
   },
 }
 
-// ========== Settings ==========
 export const RedisSettings = {
   async set(key: string, value: any) {
     const client = getRedisClient()
@@ -183,7 +199,6 @@ export const RedisSettings = {
   },
 }
 
-// ========== Monitoring ==========
 export const RedisMonitoring = {
   async recordEvent(eventType: string, eventData?: any) {
     const client = getRedisClient()
@@ -203,7 +218,8 @@ export const RedisMonitoring = {
     }
     await client.hmset(eventId, ...args)
     await client.sadd("monitoring:events", eventId)
-    await client.expire(eventId, 2592000) // 30 days
+    await client.expire("monitoring:events", TTL.INDEX_SET)
+    await client.expire(eventId, TTL.MONITORING_EVENT)
   },
 
   async getStatistics() {
@@ -222,7 +238,6 @@ export const RedisMonitoring = {
   },
 }
 
-// ========== Backup ==========
 export const RedisBackup = {
   async createSnapshot(name: string) {
     const client = getRedisClient()
@@ -233,7 +248,9 @@ export const RedisBackup = {
       created_at: new Date().toISOString(),
       status: "completed",
     })
+    await client.expire(snapshotId, TTL.SNAPSHOT)
     await client.sadd("snapshots:all", snapshotId)
+    await client.expire("snapshots:all", TTL.INDEX_SET)
     return snapshotId
   },
 
@@ -243,24 +260,26 @@ export const RedisBackup = {
     const snapshots = []
     for (const id of snapshotIds) {
       const snapshot = await client.hgetall(id)
-      if (snapshot) snapshots.push(snapshot)
+      if (snapshot && Object.keys(snapshot).length > 0) snapshots.push(snapshot)
     }
     return snapshots
   },
 }
 
-// ========== Presets ==========
 export const RedisPresets = {
   async createPreset(preset: any) {
     const client = getRedisClient()
     const key = `preset:${preset.id}`
     await client.hset(key, preset)
     await client.sadd("presets:all", preset.id)
+    await client.expire("presets:all", TTL.INDEX_SET)
     if (preset.is_active) {
       await client.sadd("presets:active", preset.id)
+      await client.expire("presets:active", TTL.INDEX_SET)
     }
     if (preset.is_predefined) {
       await client.sadd("presets:predefined", preset.id)
+      await client.expire("presets:predefined", TTL.INDEX_SET)
     }
     return preset
   },
@@ -299,6 +318,7 @@ export const RedisPresets = {
     if (existing.is_active !== updatedData.is_active) {
       if (updatedData.is_active) {
         await client.sadd("presets:active", id)
+        await client.expire("presets:active", TTL.INDEX_SET)
       } else {
         await client.srem("presets:active", id)
       }
@@ -307,6 +327,7 @@ export const RedisPresets = {
     if (existing.is_predefined !== updatedData.is_predefined) {
       if (updatedData.is_predefined) {
         await client.sadd("presets:predefined", id)
+        await client.expire("presets:predefined", TTL.INDEX_SET)
       } else {
         await client.srem("presets:predefined", id)
       }
@@ -329,15 +350,16 @@ export const RedisPresets = {
   },
 }
 
-// ========== Preset Types ==========
 export const RedisPresetTypes = {
   async createPresetType(presetType: any) {
     const client = getRedisClient()
     const key = `preset_type:${presetType.id}`
     await client.hset(key, presetType)
     await client.sadd("preset_types:all", presetType.id)
+    await client.expire("preset_types:all", TTL.INDEX_SET)
     if (presetType.is_active) {
       await client.sadd("preset_types:active", presetType.id)
+      await client.expire("preset_types:active", TTL.INDEX_SET)
     }
     return presetType
   },
@@ -376,6 +398,7 @@ export const RedisPresetTypes = {
     if (existing.is_active !== updatedData.is_active) {
       if (updatedData.is_active) {
         await client.sadd("preset_types:active", id)
+        await client.expire("preset_types:active", TTL.INDEX_SET)
       } else {
         await client.srem("preset_types:active", id)
       }

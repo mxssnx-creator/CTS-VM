@@ -1,6 +1,10 @@
 /**
  * Engine Progress Logging System
  * Provides detailed, structured logging for all engine processing phases and cycles
+ * 
+ * Redis TTL Policy: 30 days (2592000 seconds)
+ * Max entries per connection: 10000
+ * Flush interval: 10 seconds (unref'd to not block exit)
  */
 
 import { getRedisClient, initRedis } from "@/lib/redis-db"
@@ -27,11 +31,16 @@ export interface EngineProgressLog {
   }
 }
 
+const LOG_TTL_SECONDS = 2592000 // 30 days
+const MAX_LOG_ENTRIES = 10000
+const FLUSH_INTERVAL_MS = 10000 // 10 seconds
+
 class StructuredLogger {
   private connectionId: string
   private logBuffer: EngineProgressLog[] = []
   private maxBufferSize = 1000
-  private flushInterval = 10000 // 10 seconds
+  private flushTimer: ReturnType<typeof setInterval> | null = null
+  private isFlushing = false
 
   constructor(connectionId: string) {
     this.connectionId = connectionId
@@ -39,7 +48,25 @@ class StructuredLogger {
   }
 
   private startFlushTimer() {
-    setInterval(() => this.flushLogs(), this.flushInterval)
+    if (this.flushTimer) return
+    this.flushTimer = setInterval(() => {
+      if (!this.isFlushing) {
+        this.flushLogs()
+      }
+    }, FLUSH_INTERVAL_MS)
+    if (typeof this.flushTimer.unref === 'function') {
+      (this.flushTimer as any).unref()
+    }
+  }
+
+  destroy() {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
+    }
+    if (this.logBuffer.length > 0) {
+      this.flushLogs()
+    }
   }
 
   async logCycleStart(engine: string, cycle: number) {
@@ -146,27 +173,25 @@ class StructuredLogger {
   }
 
   private async flushLogs() {
-    if (this.logBuffer.length === 0) return
+    if (this.logBuffer.length === 0 || this.isFlushing) return
 
+    this.isFlushing = true
     try {
       await initRedis()
       const client = getRedisClient()
       const logKey = `engine:logs:${this.connectionId}`
-      const timestamp = new Date().toISOString()
 
-      // Store logs in Redis with TTL (30 days)
-      for (const log of this.logBuffer) {
-        await client.lpush(logKey, JSON.stringify(log))
-      }
+      const serializedLogs = this.logBuffer.map(log => JSON.stringify(log))
+      await client.rpush(logKey, ...serializedLogs)
 
-      // Trim to last 10000 entries
-      await client.ltrim(logKey, 0, 9999)
-      await client.expire(logKey, 2592000) // 30 days
+      await client.ltrim(logKey, -MAX_LOG_ENTRIES, -1)
+      await client.expire(logKey, LOG_TTL_SECONDS)
 
-      console.log(`[v0] [Logger] Flushed ${this.logBuffer.length} logs to Redis`)
       this.logBuffer = []
     } catch (error) {
       console.error("[v0] [Logger] Failed to flush logs:", error)
+    } finally {
+      this.isFlushing = false
     }
   }
 
@@ -175,7 +200,7 @@ class StructuredLogger {
       await initRedis()
       const client = getRedisClient()
       const logKey = `engine:logs:${this.connectionId}`
-      const rawLogs = await client.lrange(logKey, 0, limit - 1)
+      const rawLogs = await client.lrange(logKey, -limit, -1)
       return rawLogs.map((log) => JSON.parse(log) as EngineProgressLog)
     } catch (error) {
       console.error("[v0] [Logger] Failed to retrieve logs:", error)
@@ -184,7 +209,6 @@ class StructuredLogger {
   }
 }
 
-// Global logger instances
 const loggers = new Map<string, StructuredLogger>()
 
 export function getStructuredLogger(connectionId: string): StructuredLogger {
@@ -192,6 +216,21 @@ export function getStructuredLogger(connectionId: string): StructuredLogger {
     loggers.set(connectionId, new StructuredLogger(connectionId))
   }
   return loggers.get(connectionId)!
+}
+
+export function destroyStructuredLogger(connectionId: string): void {
+  const logger = loggers.get(connectionId)
+  if (logger) {
+    logger.destroy()
+    loggers.delete(connectionId)
+  }
+}
+
+export function cleanupAllLoggers(): void {
+  for (const [id, logger] of loggers) {
+    logger.destroy()
+  }
+  loggers.clear()
 }
 
 export async function logProgressionEvent(

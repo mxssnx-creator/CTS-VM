@@ -31,13 +31,10 @@ export interface WorkflowLogEntry {
   duration?: number
 }
 
-export class WorkflowLogger {
-  private static readonly MAX_LOGS_PER_CONNECTION = 1000
-  private static readonly LOG_RETENTION_DAYS = 7
+const LOG_TTL_SECONDS = 604800 // 7 days
+const MAX_LOGS_PER_CONNECTION = 1000
 
-  /**
-   * Log a workflow event with structured data
-   */
+export class WorkflowLogger {
   static async logEvent(
     connectionId: string,
     eventType: WorkflowEventType,
@@ -68,7 +65,6 @@ export class WorkflowLogger {
       const logKey = `workflow_logs:${connectionId}`
       const logsJson = JSON.stringify(logEntry)
 
-      // Store in Redis list instead of sorted set (Upstash doesn't support zadd)
       let workflowLogs: string[] = []
       
       const existing = await client.get(logKey)
@@ -76,40 +72,18 @@ export class WorkflowLogger {
         try { workflowLogs = JSON.parse(existing) } catch { workflowLogs = [] }
       }
       
-      // Prepend new entry
       workflowLogs.unshift(logsJson)
       
-      // Trim to max entries and set expiration for logs (7 days)
-      if (workflowLogs.length > this.MAX_LOGS_PER_CONNECTION) {
-        workflowLogs = workflowLogs.slice(0, this.MAX_LOGS_PER_CONNECTION)
+      if (workflowLogs.length > MAX_LOGS_PER_CONNECTION) {
+        workflowLogs = workflowLogs.slice(0, MAX_LOGS_PER_CONNECTION)
       }
       
-      await client.set(logKey, JSON.stringify(workflowLogs))
-      // Upstash doesn't support expire, so we'll handle this via TTL keys elsewhere
-
-      // Also log to console with structured format
-      const levelEmoji = {
-        success: "✓",
-        pending: "⏳",
-        failed: "✗",
-        warning: "⚠",
-      }[logEntry.status]
-
-      const symbol = logEntry.symbol ? ` [${logEntry.symbol}]` : ""
-      const duration = logEntry.duration ? ` (${logEntry.duration}ms)` : ""
-
-      console.log(
-        `[v0] [${eventType.toUpperCase()}] ${levelEmoji} ${message}${symbol}${duration}`,
-        logEntry.details ? logEntry.details : ""
-      )
+      await client.set(logKey, JSON.stringify(workflowLogs), { EX: LOG_TTL_SECONDS })
     } catch (error) {
       console.error("[v0] [WorkflowLogger] Error logging event:", error)
     }
   }
 
-  /**
-   * Get workflow logs for a connection
-   */
   static async getLogs(
     connectionId: string,
     limit: number = 100,
@@ -120,29 +94,30 @@ export class WorkflowLogger {
       const client = getRedisClient()
 
       const logKey = `workflow_logs:${connectionId}`
-      const logsJson = await (client as any).zrevrange(logKey, 0, limit - 1)
+      const existing = await client.get(logKey)
+      if (!existing) return []
 
-      let logs: WorkflowLogEntry[] = logsJson.map((log: string) =>
-        JSON.parse(log)
-      )
+      let logs: WorkflowLogEntry[] = []
+      try {
+        logs = JSON.parse(existing)
+      } catch {
+        return []
+      }
 
       if (eventType) {
         logs = logs.filter((log) => log.eventType === eventType)
       }
 
-      return logs
+      return logs.slice(0, limit)
     } catch (error) {
       console.error("[v0] [WorkflowLogger] Error retrieving logs:", error)
       return []
     }
   }
 
-  /**
-   * Get workflow statistics for a connection
-   */
   static async getStats(
     connectionId: string,
-    timeWindowMs: number = 3600000 // 1 hour default
+    timeWindowMs: number = 3600000
   ): Promise<Record<string, any>> {
     try {
       const logs = await this.getLogs(connectionId, 1000)
@@ -164,7 +139,6 @@ export class WorkflowLogger {
         time_window_ms: timeWindowMs,
       }
 
-      // Count by event type
       recentLogs.forEach((log) => {
         stats.events_by_type[log.eventType] =
           (stats.events_by_type[log.eventType] || 0) + 1
@@ -177,26 +151,18 @@ export class WorkflowLogger {
     }
   }
 
-  /**
-   * Clear logs for a connection
-   */
   static async clearLogs(connectionId: string): Promise<void> {
     try {
       await initRedis()
       const client = getRedisClient()
 
       const logKey = `workflow_logs:${connectionId}`
-      await (client as any).del(logKey)
-
-      console.log(`[v0] [WorkflowLogger] Cleared logs for ${connectionId}`)
+      await client.del(logKey)
     } catch (error) {
       console.error("[v0] [WorkflowLogger] Error clearing logs:", error)
     }
   }
 
-  /**
-   * Log engine lifecycle events
-   */
   static async logEngineEvent(
     connectionId: string,
     event: "start" | "stop" | "error",
@@ -210,9 +176,6 @@ export class WorkflowLogger {
     })
   }
 
-  /**
-   * Log trade entry/exit events
-   */
   static async logTradeEvent(
     connectionId: string,
     symbol: string,
@@ -234,9 +197,6 @@ export class WorkflowLogger {
     })
   }
 
-  /**
-   * Log indication signal detections
-   */
   static async logIndicationSignal(
     connectionId: string,
     symbol: string,
@@ -256,9 +216,6 @@ export class WorkflowLogger {
     )
   }
 
-  /**
-   * Log progression cycle events
-   */
   static async logProgressionCycle(
     connectionId: string,
     cycleNumber: number,
@@ -278,9 +235,6 @@ export class WorkflowLogger {
     )
   }
 
-  /**
-   * Log pseudo position updates
-   */
   static async logPseudoPositionUpdate(
     connectionId: string,
     symbol: string,
