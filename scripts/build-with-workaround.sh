@@ -65,8 +65,3 @@ done
 echo ""
 echo "❌ Build failed after $MAX_RETRIES attempts"
 exit 1
-done
-
-echo ""
-echo "❌ Build failed after $MAX_RETRIES attempts"
-exit 1
