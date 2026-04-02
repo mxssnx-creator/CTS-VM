@@ -40,6 +40,27 @@ export const RedisConnections = {
     }
     return connections
   },
+
+  async updateConnection(id: string, updates: any) {
+    const client = getRedisClient()
+    const key = `connection:${id}`
+    const existing = await this.getConnection(id)
+    if (!existing) return null
+
+    const updatedData = { ...existing, ...updates }
+    await client.hset(key, updatedData)
+    return updatedData
+  },
+
+  async deleteConnection(id: string) {
+    const client = getRedisClient()
+    const connection = await this.getConnection(id)
+    if (!connection) return null
+
+    await client.del(`connection:${id}`)
+    await client.srem("connections:all", id)
+    return connection
+  },
 }
 
 // ========== Trades ==========
@@ -96,6 +117,27 @@ export const RedisPositions = {
     }
     return positions
   },
+
+  async updatePosition(id: string, updates: any) {
+    const client = getRedisClient()
+    const key = `position:${id}`
+    const existing = await this.getPosition(id)
+    if (!existing) return null
+
+    const updatedData = { ...existing, ...updates }
+    await client.hset(key, updatedData)
+    return updatedData
+  },
+
+  async deletePosition(id: string) {
+    const client = getRedisClient()
+    const position = await this.getPosition(id)
+    if (!position) return null
+
+    await client.del(`position:${id}`)
+    await client.srem("positions:all", id)
+    return position
+  },
 }
 
 // ========== Cache ==========
@@ -124,6 +166,20 @@ export const RedisSettings = {
     const client = getRedisClient()
     const data = await client.get(`settings:${key}`)
     return data ? JSON.parse(data) : null
+  },
+
+  async getAll() {
+    const client = getRedisClient()
+    const keys = await client.keys(`settings:*`)
+    const settings: Record<string, any> = {}
+    for (const key of keys) {
+      const data = await client.get(key)
+      if (data) {
+        const settingKey = key.replace(/^settings:/, "")
+        settings[settingKey] = JSON.parse(data)
+      }
+    }
+    return settings
   },
 }
 
@@ -190,5 +246,153 @@ export const RedisBackup = {
       if (snapshot) snapshots.push(snapshot)
     }
     return snapshots
+  },
+}
+
+// ========== Presets ==========
+export const RedisPresets = {
+  async createPreset(preset: any) {
+    const client = getRedisClient()
+    const key = `preset:${preset.id}`
+    await client.hset(key, preset)
+    await client.sadd("presets:all", preset.id)
+    if (preset.is_active) {
+      await client.sadd("presets:active", preset.id)
+    }
+    if (preset.is_predefined) {
+      await client.sadd("presets:predefined", preset.id)
+    }
+    return preset
+  },
+
+  async getPreset(id: string) {
+    const client = getRedisClient()
+    const data = await client.hgetall(`preset:${id}`)
+    return data && Object.keys(data).length > 0 ? data : null
+  },
+
+  async getAllPresets(activeOnly: boolean = false) {
+    const client = getRedisClient()
+    let ids: string[]
+    if (activeOnly) {
+      ids = (await client.smembers("presets:active")) || []
+    } else {
+      ids = (await client.smembers("presets:all")) || []
+    }
+    const presets = []
+    for (const id of ids) {
+      const preset = await this.getPreset(id)
+      if (preset) presets.push(preset)
+    }
+    return presets
+  },
+
+  async updatePreset(id: string, updates: any) {
+    const client = getRedisClient()
+    const key = `preset:${id}`
+    const existing = await this.getPreset(id)
+    if (!existing) return null
+
+    const updatedData = { ...existing, ...updates }
+    await client.hset(key, updatedData)
+
+    if (existing.is_active !== updatedData.is_active) {
+      if (updatedData.is_active) {
+        await client.sadd("presets:active", id)
+      } else {
+        await client.srem("presets:active", id)
+      }
+    }
+
+    if (existing.is_predefined !== updatedData.is_predefined) {
+      if (updatedData.is_predefined) {
+        await client.sadd("presets:predefined", id)
+      } else {
+        await client.srem("presets:predefined", id)
+      }
+    }
+
+    return updatedData
+  },
+
+  async deletePreset(id: string) {
+    const client = getRedisClient()
+    const preset = await this.getPreset(id)
+    if (!preset) return null
+
+    await client.del(`preset:${id}`)
+    await client.srem("presets:all", id)
+    await client.srem("presets:active", id)
+    await client.srem("presets:predefined", id)
+
+    return preset
+  },
+}
+
+// ========== Preset Types ==========
+export const RedisPresetTypes = {
+  async createPresetType(presetType: any) {
+    const client = getRedisClient()
+    const key = `preset_type:${presetType.id}`
+    await client.hset(key, presetType)
+    await client.sadd("preset_types:all", presetType.id)
+    if (presetType.is_active) {
+      await client.sadd("preset_types:active", presetType.id)
+    }
+    return presetType
+  },
+
+  async getPresetType(id: string) {
+    const client = getRedisClient()
+    const data = await client.hgetall(`preset_type:${id}`)
+    return data && Object.keys(data).length > 0 ? data : null
+  },
+
+  async getAllPresetTypes(activeOnly: boolean = false) {
+    const client = getRedisClient()
+    let ids: string[]
+    if (activeOnly) {
+      ids = (await client.smembers("preset_types:active")) || []
+    } else {
+      ids = (await client.smembers("preset_types:all")) || []
+    }
+    const presetTypes = []
+    for (const id of ids) {
+      const presetType = await this.getPresetType(id)
+      if (presetType) presetTypes.push(presetType)
+    }
+    return presetTypes
+  },
+
+  async updatePresetType(id: string, updates: any) {
+    const client = getRedisClient()
+    const key = `preset_type:${id}`
+    const existing = await this.getPresetType(id)
+    if (!existing) return null
+
+    const updatedData = { ...existing, ...updates }
+    await client.hset(key, updatedData)
+
+    if (existing.is_active !== updatedData.is_active) {
+      if (updatedData.is_active) {
+        await client.sadd("preset_types:active", id)
+      } else {
+        await client.srem("preset_types:active", id)
+      }
+    }
+
+    return updatedData
+  },
+
+  async deletePresetType(id: string) {
+    const client = getRedisClient()
+    const presetType = await this.getPresetType(id)
+    if (!presetType) return null
+
+    await client.del(`preset_type:${id}`)
+    await client.srem("preset_types:all", id)
+    await client.srem("preset_types:active", id)
+
+    return presetType
   },
 }

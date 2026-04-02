@@ -5,7 +5,6 @@
  */
 
 import { initRedis, getSettings, setSettings } from "@/lib/redis-db"
-import { query } from "@/lib/db"
 
 export interface PositionThresholdConfig {
   maxPositionsPerSymbol: number // 250 per symbol

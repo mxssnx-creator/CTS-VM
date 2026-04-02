@@ -1,5 +1,5 @@
 // Market data fetcher for real-time price updates
-import { query } from "./db"
+import { getRedisClient, saveMarketData } from "./redis-db"
 
 export interface MarketDataPoint {
   trading_pair_id: number
@@ -48,15 +48,31 @@ export class MarketDataFetcher {
 
   private async fetchMarketData() {
     try {
-      // Get all active trading pairs
-      const tradingPairs = await query("SELECT id, symbol FROM trading_pairs WHERE is_active = $1", [true])
+      const client = getRedisClient()
+      
+      // Get all trading pair IDs from the set
+      const tradingPairIds = await client.smembers("trading_pairs") || []
+      const tradingPairs = []
+
+      // Filter active pairs and get symbol from hash
+      for (const id of tradingPairIds) {
+        const hashKey = `trading_pair:${id}`
+        const pairData = await client.hgetall(hashKey)
+        
+        if (pairData && pairData.is_active === "1") {
+          tradingPairs.push({
+            id: parseInt(id, 10),
+            symbol: pairData.symbol || ""
+          })
+        }
+      }
 
       for (const pair of tradingPairs) {
         // Simulate fetching market data (in production, call exchange API)
         const marketData = this.generateMarketData(pair.id, pair.symbol)
 
-        // Store in database
-        await this.storeMarketData(marketData)
+        // Store in Redis as JSON
+        await saveMarketData(pair.symbol, marketData)
       }
 
       console.log(`[v0] Fetched market data for ${tradingPairs.length} trading pairs`)
@@ -84,21 +100,6 @@ export class MarketDataFetcher {
       low,
       close,
       volume,
-    }
-  }
-
-  private async storeMarketData(data: MarketDataPoint) {
-    try {
-      await query(
-        `INSERT INTO market_data 
-         (trading_pair_id, timestamp, open, high, low, close, volume, interval)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (trading_pair_id, timestamp, interval) DO UPDATE
-         SET open = $3, high = $4, low = $5, close = $6, volume = $7`,
-        [data.trading_pair_id, data.timestamp, data.open, data.high, data.low, data.close, data.volume, "1m"],
-      )
-    } catch (error) {
-      console.error("[v0] Error storing market data:", error)
     }
   }
 }

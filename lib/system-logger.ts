@@ -33,6 +33,14 @@ export class SystemLogger {
       // Add to category index
       await client.sadd(`logs:${entry.category}`, logId)
 
+      // If this log is associated with a connection, add to connection-specific list
+      if (entry.metadata?.connectionId) {
+        const connectionId = entry.metadata.connectionId
+        await client.lpush(`logs:connection:${connectionId}`, logId)
+        // Trim list to keep only the most recent 1000 logs per connection
+        await client.ltrim(`logs:connection:${connectionId}`, 0, 999)
+      }
+
       // Set TTL for logs (7 days = 604800 seconds)
       await client.expire(logKey, 604800)
     } catch (error) {

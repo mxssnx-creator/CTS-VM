@@ -1,5 +1,5 @@
 // Order execution engine for trading bot
-import { query } from "./db"
+import { getRedisClient } from "./redis-db"
 
 export interface OrderParams {
   user_id: number
@@ -21,56 +21,85 @@ export interface ExecutionResult {
 }
 
 export class OrderExecutor {
+  private async getNextOrderId(): Promise<number> {
+    const client = getRedisClient()
+    return await client.hincrby("counters", "order_id", 1)
+  }
+
   async executeOrder(params: OrderParams): Promise<ExecutionResult> {
     try {
       console.log("[v0] Executing order:", params)
-
-      // Create order in database
-      const orderResult = await query(
-        `INSERT INTO orders 
-         (user_id, portfolio_id, trading_pair_id, order_type, side, price, quantity, 
-          remaining_quantity, time_in_force, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9)
-         RETURNING id`,
-        [
-          params.user_id,
-          params.portfolio_id,
-          params.trading_pair_id,
-          params.order_type,
-          params.side,
-          params.price || null,
-          params.quantity,
-          params.time_in_force || "GTC",
-          "pending",
-        ],
-      )
-
-      const orderId = orderResult[0].id
-
-      // Simulate order execution (in production, this would call exchange API)
-      const executionPrice = params.price || (await this.getMarketPrice(params.trading_pair_id))
+      const client = getRedisClient()
+      
+      // Fetch trading pair symbol for denormalization
+      const tp = await client.hgetall(`trading_pair:${params.trading_pair_id}`)
+      const symbol = tp?.symbol || null
+      
+      // Generate order ID
+      const orderId = await this.getNextOrderId()
+      const now = Date.now()
+      
+      // Build order hash data
+      const orderData: Record<string, string> = {
+        id: String(orderId),
+        user_id: String(params.user_id),
+        portfolio_id: String(params.portfolio_id),
+        trading_pair_id: String(params.trading_pair_id),
+        order_type: params.order_type,
+        side: params.side,
+        quantity: String(params.quantity),
+        remaining_quantity: String(params.quantity),
+        status: "pending",
+        time_in_force: params.time_in_force || "GTC",
+        created_at: String(now),
+      }
+      if (params.price !== undefined && params.price !== null) {
+        orderData.price = String(params.price)
+      }
+      if (symbol) {
+        orderData.symbol = symbol
+      }
+      
+      // Store order hash
+      await client.hset(`order:${orderId}`, orderData)
+      
+      // Add to orders sets
+      await client.sadd("orders", String(orderId))
+      await client.sadd(`user:${params.user_id}:orders`, String(orderId))
+      
+      // Simulate execution
+      const executionPrice = params.price || await this.getMarketPrice(params.trading_pair_id)
       const filledQuantity = params.quantity
-
-      // Update order status
-      await query(
-        `UPDATE orders
-         SET status = $1,
-             filled_quantity = $2,
-             average_fill_price = $3,
-             executed_at = CURRENT_TIMESTAMP
-         WHERE id = $4`,
-        ["filled", filledQuantity, executionPrice, orderId],
-      )
-
+      const executedAt = Date.now()
+      
+      // Update order to filled status
+      const updateData: Record<string, string> = {
+        status: "filled",
+        filled_quantity: String(filledQuantity),
+        average_fill_price: String(executionPrice),
+        executed_at: String(executedAt),
+        remaining_quantity: "0"
+      }
+      await client.hset(`order:${orderId}`, updateData)
+      
       // Create trade record
-      await query(
-        `INSERT INTO trades (order_id, price, quantity, executed_at)
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-        [orderId, executionPrice, filledQuantity],
-      )
-
+      const tradeId = `trade-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const tradeData: Record<string, string> = {
+        id: tradeId,
+        order_id: String(orderId),
+        user_id: String(params.user_id),
+        price: String(executionPrice),
+        quantity: String(filledQuantity),
+        executed_at: String(executedAt)
+      }
+      if (symbol) {
+        tradeData.symbol = symbol
+      }
+      await client.hset(`trade:${tradeId}`, tradeData)
+      await client.sadd("trades", tradeId)
+      
       console.log(`[v0] Order ${orderId} executed successfully`)
-
+      
       return {
         success: true,
         order_id: orderId,
@@ -88,15 +117,21 @@ export class OrderExecutor {
 
   async cancelOrder(orderId: number, userId: number): Promise<boolean> {
     try {
-      const result = await query(
-        `UPDATE orders
-         SET status = $1
-         WHERE id = $2 AND user_id = $3 AND status IN ($4, $5)
-         RETURNING id`,
-        ["cancelled", orderId, userId, "pending", "open"],
-      )
-
-      return result.length > 0
+      const client = getRedisClient()
+      const orderKey = `order:${orderId}`
+      const order = await client.hgetall(orderKey)
+      if (!order || Object.keys(order).length === 0) {
+        return false
+      }
+      
+      const orderUserId = parseInt(order.user_id || "0", 10)
+      const status = order.status || ""
+      if (orderUserId !== userId || !["pending", "open"].includes(status)) {
+        return false
+      }
+      
+      await client.hset(orderKey, { status: "cancelled" })
+      return true
     } catch (error) {
       console.error("[v0] Order cancellation error:", error)
       return false
@@ -104,33 +139,46 @@ export class OrderExecutor {
   }
 
   private async getMarketPrice(tradingPairId: number): Promise<number> {
-    // In production, fetch from exchange API
-    // For now, get latest market data from database
-    const result = await query(
-      `SELECT close FROM market_data
-       WHERE trading_pair_id = $1
-       ORDER BY timestamp DESC
-       LIMIT 1`,
-      [tradingPairId],
-    )
-
-    if (result.length > 0) {
-      return result[0].close
+    const client = getRedisClient()
+    const tp = await client.hgetall(`trading_pair:${tradingPairId}`)
+    const symbol = tp?.symbol
+    if (!symbol) {
+      return 50000
     }
-
-    // Fallback to a default price (should not happen in production)
-    return 50000
+    
+    const marketDataRaw = await client.get(`market_data:${symbol}`)
+    if (!marketDataRaw) {
+      return 50000
+    }
+    try {
+      const marketData = JSON.parse(marketDataRaw)
+      return parseFloat(marketData.close) || 50000
+    } catch {
+      return 50000
+    }
   }
 
   async getOrderStatus(orderId: number, userId: number) {
-    const result = await query(
-      `SELECT o.*, tp.symbol
-       FROM orders o
-       JOIN trading_pairs tp ON o.trading_pair_id = tp.id
-       WHERE o.id = $1 AND o.user_id = $2`,
-      [orderId, userId],
-    )
-
-    return result[0] || null
+    const client = getRedisClient()
+    const order = await client.hgetall(`order:${orderId}`)
+    
+    if (!order || Object.keys(order).length === 0) {
+      return null
+    }
+    
+    const orderUserId = parseInt(order.user_id || "0", 10)
+    if (orderUserId !== userId) {
+      return null
+    }
+    
+    // Ensure symbol is present
+    if (!order.symbol) {
+      const tp = await client.hgetall(`trading_pair:${order.trading_pair_id}`)
+      if (tp?.symbol) {
+        order.symbol = tp.symbol
+      }
+    }
+    
+    return order
   }
 }

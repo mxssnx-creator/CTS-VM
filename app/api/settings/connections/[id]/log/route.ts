@@ -1,29 +1,48 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import { getRedisClient } from "@/lib/redis-db"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    const client = getRedisClient()
 
-    // Get connection logs from database
-    const logs = await query(
-      `SELECT * FROM connection_logs 
-       WHERE connection_id = $1 
-       ORDER BY timestamp DESC 
-       LIMIT 100`,
-      [id],
-    )
+    // Get connection info from hash
+    const connection = await client.hgetall(`connection:${id}`)
 
-    // Get connection info
-    const connection = await query(
-      `SELECT name, exchange, is_enabled, last_test_status, last_test_timestamp 
-       FROM exchange_connections 
-       WHERE id = $1`,
-      [id],
-    )
+    // Get logs from list (most recent first)
+    // Using LPUSH to add newest to head, LRANGE to get latest
+    const logKeys = await client.lrange(`logs:connection:${id}`, 0, 99) // Get up to 100 most recent
+
+     // Fetch all log entries
+     const logs = []
+     for (const logKey of logKeys) {
+       const logData = await client.hgetall(logKey)
+       if (logData && Object.keys(logData).length > 0) {
+         // Parse metadata safely
+         let metadata: any = undefined
+         if (logData.metadata) {
+           try {
+             metadata = JSON.parse(logData.metadata)
+           } catch {
+             metadata = {}
+           }
+         }
+         // Extract connection_id from metadata if present
+         const connectionId = metadata?.connectionId || id
+         logs.push({
+           id: logData.id || logKey,
+           timestamp: logData.timestamp || "",
+           level: logData.level || "info",
+           category: logData.category || "",
+           message: logData.message || "",
+           metadata,
+           connection_id: connectionId,
+         })
+       }
+     }
 
     return NextResponse.json({
-      connection: connection[0] || null,
+      connection: connection || null,
       logs: logs || [],
       summary: {
         total: logs.length,

@@ -11,6 +11,8 @@ import {
   RedisCache,
   RedisSettings,
   RedisBackup,
+  RedisPresets,
+  RedisPresetTypes,
 } from "./redis-operations"
 
 export class RedisService {
@@ -185,5 +187,39 @@ export class RedisService {
 
   static async getAllSettings() {
     return await RedisSettings.getAll()
+  }
+
+  // Preset Management
+  static async createPreset(preset: any) {
+    await RedisPresets.createPreset(preset)
+  }
+
+  static async getPreset(id: string) {
+    return await RedisPresets.getPreset(id)
+  }
+
+  static async getAllPresets(activeOnly: boolean = false) {
+    return await RedisPresets.getAllPresets(activeOnly)
+  }
+
+  static async updatePreset(id: string, updates: any) {
+    return await RedisPresets.updatePreset(id, updates)
+  }
+
+  static async deletePreset(id: string) {
+    return await RedisPresets.deletePreset(id)
+  }
+
+  // Preset Type Management
+  static async getPresetType(id: string) {
+    return await RedisPresetTypes.getPresetType(id)
+  }
+
+  static async updatePresetType(id: string, updates: any) {
+    return await RedisPresetTypes.updatePresetType(id, updates)
+  }
+
+  static async deletePresetType(id: string) {
+    return await RedisPresetTypes.deletePresetType(id)
   }
 }

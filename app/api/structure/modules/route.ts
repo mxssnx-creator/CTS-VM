@@ -1,18 +1,48 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import { getRedisClient, initRedis } from "@/lib/redis-db"
 
 export async function GET() {
   try {
-    const connectionCheck = await query(`SELECT COUNT(*) as count FROM exchange_connections WHERE is_enabled = 1`)
-    const indicationCheck = await query(`
-      SELECT COUNT(*) as count FROM indications 
-      WHERE datetime(created_at) > datetime('now', '-5 minutes')
-    `)
-    const positionCheck = await query(`SELECT COUNT(*) as count FROM pseudo_positions WHERE status = 'active'`)
+    await initRedis()
+    const client = getRedisClient()
 
-    const activeConnections = Number.parseInt(connectionCheck[0]?.count || "0") || 0
-    const recentIndications = Number.parseInt(indicationCheck[0]?.count || "0") || 0
-    const activePositions = Number.parseInt(positionCheck[0]?.count || "0") || 0
+    // Count active connections (is_enabled = 1)
+    const connIds = await client.smembers("connections") || []
+    let activeConnections = 0
+    for (const id of connIds) {
+      const conn = await client.hgetall(`connection:${id}`)
+      if (conn && (conn.is_enabled === "1" || conn.is_enabled === true)) {
+        activeConnections++
+      }
+    }
+
+    // Count recent indications (last 5 minutes) from statistics
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    let recentIndications = 0
+    for (const connId of connIds) {
+      const key = `statistics:indications:${connId}`
+      const entries = await client.lrange(key, 0, -1)
+      for (const entryStr of entries) {
+        try {
+          const entry = JSON.parse(entryStr)
+          if (entry.calculated_at && entry.calculated_at >= fiveMinutesAgo) {
+            recentIndications++
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+
+    // Count active positions (status = 'active')
+    const posIds = await client.smembers("positions") || []
+    let activePositions = 0
+    for (const pid of posIds) {
+      const pos = await client.hgetall(`position:${pid}`)
+      if (pos && (pos.status === "active" || pos.status === "1" || pos.is_active === "1")) {
+        activePositions++
+      }
+    }
 
     const modules = [
       {

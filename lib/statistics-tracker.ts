@@ -1,8 +1,18 @@
-import { query } from "@/lib/db"
+import { getRedisClient } from "@/lib/redis-db";
+
+const MAX_ENTRIES = 10000; // keep last 10k entries per connection
+
+function getIndicationsKey(connectionId: string): string {
+  return `statistics:indications:${connectionId}`;
+}
+
+function getStrategiesKey(connectionId: string): string {
+  return `statistics:strategies:${connectionId}`;
+}
 
 /**
  * Track indication statistics - called after each indication processing cycle
- * Records indication type, value, and confidence to database for statistics
+ * Records indication type, value, and confidence to Redis for statistics
  */
 export async function trackIndicationStats(
   connectionId: string,
@@ -11,20 +21,24 @@ export async function trackIndicationStats(
   value: number,
   confidence: number
 ): Promise<void> {
-  try {
-    await query(
-      `INSERT INTO indications (connection_id, symbol, type, value, confidence, calculated_at)
-       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
-      [connectionId, symbol, indicationType, value, confidence]
-    )
-  } catch (e) {
-    console.warn(`[v0] [Stats] Failed to track indication:`, e instanceof Error ? e.message : String(e))
-  }
+  const client = getRedisClient();
+  const entry = {
+    id: `ind_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    connection_id: connectionId,
+    symbol,
+    type: indicationType,
+    value,
+    confidence,
+    calculated_at: new Date().toISOString(),
+  };
+  const key = getIndicationsKey(connectionId);
+  await client.lpush(key, JSON.stringify(entry));
+  await client.ltrim(key, 0, MAX_ENTRIES - 1);
 }
 
 /**
  * Track strategy statistics - called after strategy evaluation
- * Records strategy type, counts, and metrics to database for statistics
+ * Records strategy type, counts, and metrics to Redis for statistics
  */
 export async function trackStrategyStats(
   connectionId: string,
@@ -35,52 +49,107 @@ export async function trackStrategyStats(
   profitFactor: number,
   drawdownTimeMinutes: number
 ): Promise<void> {
-  try {
-    await query(
-      `INSERT INTO strategies_real (connection_id, symbol, type, count, passed_count, avg_profit_factor, avg_drawdown_time, evaluated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [connectionId, symbol, strategyType, totalCreated, passedCount, profitFactor, Math.round(drawdownTimeMinutes)]
-    )
-  } catch (e) {
-    console.warn(`[v0] [Stats] Failed to track strategy:`, e instanceof Error ? e.message : String(e))
-  }
+  const client = getRedisClient();
+  const entry = {
+    id: `str_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    connection_id: connectionId,
+    symbol,
+    type: strategyType,
+    count: totalCreated,
+    passed_count: passedCount,
+    avg_profit_factor: profitFactor,
+    avg_drawdown_time: Math.round(drawdownTimeMinutes),
+    evaluated_at: new Date().toISOString(),
+  };
+  const key = getStrategiesKey(connectionId);
+  await client.lpush(key, JSON.stringify(entry));
+  await client.ltrim(key, 0, MAX_ENTRIES - 1);
 }
 
 /**
  * Get recent indication statistics for dashboard
  */
-export async function getIndicationStats(connectionId: string, hoursBack: number = 24): Promise<any> {
-  try {
-    const stats = await query(
-      `SELECT type, COUNT(*) as count, AVG(value) as avg_value, AVG(confidence) as avg_confidence
-       FROM indications
-       WHERE connection_id = ? AND calculated_at > datetime('now', ?)
-       GROUP BY type`,
-      [connectionId, `-${hoursBack} hours`]
-    )
-    return stats || []
-  } catch (e) {
-    console.warn(`[v0] [Stats] Failed to get indication stats:`, e instanceof Error ? e.message : String(e))
-    return []
+export async function getIndicationStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
+  const client = getRedisClient();
+  const key = getIndicationsKey(connectionId);
+  const allEntries = await client.lrange(key, 0, -1);
+  if (!allEntries || allEntries.length === 0) return [];
+
+  const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+  const filtered: any[] = [];
+  for (const entryStr of allEntries) {
+    try {
+      const entry = JSON.parse(entryStr);
+      if (entry.calculated_at >= cutoff) {
+        filtered.push(entry);
+      }
+    } catch (e) {
+      // ignore malformed entries
+    }
   }
+
+  // Group by type and aggregate
+  const groups: Record<string, any[]> = {};
+  for (const entry of filtered) {
+    const type = entry.type;
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(entry);
+  }
+
+  return Object.entries(groups).map(([type, entries]) => {
+    const count = entries.length;
+    const avg_value = entries.reduce((sum, e) => sum + e.value, 0) / count;
+    const avg_confidence = entries.reduce((sum, e) => sum + e.confidence, 0) / count;
+    return {
+      type,
+      count,
+      avg_value,
+      avg_confidence,
+    };
+  });
 }
 
 /**
  * Get recent strategy statistics for dashboard
  */
-export async function getStrategyStats(connectionId: string, hoursBack: number = 24): Promise<any> {
-  try {
-    const stats = await query(
-      `SELECT type, COUNT(*) as count, SUM(passed_count) as total_passed, 
-              AVG(avg_profit_factor) as avg_profit_factor, AVG(avg_drawdown_time) as avg_drawdown_time
-       FROM strategies_real
-       WHERE connection_id = ? AND evaluated_at > datetime('now', ?)
-       GROUP BY type`,
-      [connectionId, `-${hoursBack} hours`]
-    )
-    return stats || []
-  } catch (e) {
-    console.warn(`[v0] [Stats] Failed to get strategy stats:`, e instanceof Error ? e.message : String(e))
-    return []
+export async function getStrategyStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
+  const client = getRedisClient();
+  const key = getStrategiesKey(connectionId);
+  const allEntries = await client.lrange(key, 0, -1);
+  if (!allEntries || allEntries.length === 0) return [];
+
+  const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+  const filtered: any[] = [];
+  for (const entryStr of allEntries) {
+    try {
+      const entry = JSON.parse(entryStr);
+      if (entry.evaluated_at >= cutoff) {
+        filtered.push(entry);
+      }
+    } catch (e) {
+      // ignore malformed entries
+    }
   }
+
+  // Group by type and aggregate
+  const groups: Record<string, any[]> = {};
+  for (const entry of filtered) {
+    const type = entry.type;
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(entry);
+  }
+
+  return Object.entries(groups).map(([type, entries]) => {
+    const count = entries.length;
+    const total_passed = entries.reduce((sum, e) => sum + e.passed_count, 0);
+    const avg_profit_factor = entries.reduce((sum, e) => sum + e.avg_profit_factor, 0) / count;
+    const avg_drawdown_time = entries.reduce((sum, e) => sum + e.avg_drawdown_time, 0) / count;
+    return {
+      type,
+      count,
+      total_passed,
+      avg_profit_factor,
+      avg_drawdown_time,
+    };
+  });
 }

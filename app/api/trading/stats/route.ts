@@ -1,90 +1,166 @@
 import { NextResponse } from "next/server"
-import { loadConnections } from "@/lib/file-storage"
-import { SystemLogger } from "@/lib/system-logger"
-import { query } from "@/lib/db"
+import { getRedisClient } from "@/lib/redis-db"
+
+interface PositionData {
+  id: string
+  connectionId?: string
+  pnl: number
+  timestamp: Date
+  status: string
+}
+
+// Helper to compute P&L for a position based on its data
+function computePnl(pos: any): number {
+  const entryPrice = parseFloat(pos.entry_price || pos.entryPrice || "0")
+  const quantity = parseFloat(pos.quantity || "0")
+  const side = pos.side || pos.direction || "long"
+
+  // If closed and realized_pnl exists, use that
+  if (pos.status !== "open" && pos.status !== "active" && pos.realized_pnl) {
+    return parseFloat(pos.realized_pnl)
+  }
+
+  // For open positions, use current price
+  const currentPrice = parseFloat(pos.current_price || pos.currentPrice || pos.entry_price || "0")
+  const priceDiff = side === "long" ? currentPrice - entryPrice : entryPrice - currentPrice
+  return priceDiff * quantity
+}
+
+// Helper to get timestamp from position
+function getTimestamp(pos: any): Date | null {
+  // Try created_at first, then opened_at
+  const ts = pos.created_at || pos.opened_at || pos.calculated_at
+  if (!ts) return null
+  return new Date(ts)
+}
+
+// Fetch all pseudo positions from both storage patterns
+async function getAllPseudoPositions(): Promise<PositionData[]> {
+  const client = getRedisClient()
+  const positions: PositionData[] = []
+
+  // 1. Non-preset positions: per-connection sets
+  const connectionIds = await client.smembers("connections")
+  for (const connId of connectionIds) {
+    const posIds = await client.smembers(`pseudo_positions:${connId}`)
+    for (const posId of posIds) {
+      const key = `pseudo_position:${connId}:${posId}`
+      const data = await client.hgetall(key)
+      if (data && Object.keys(data).length > 0) {
+        const pnl = computePnl(data)
+        const ts = getTimestamp(data)
+        if (ts) {
+          positions.push({
+            id: posId,
+            connectionId: connId,
+            pnl,
+            timestamp: ts,
+            status: data.status,
+          })
+        }
+      }
+    }
+  }
+
+  // 2. Preset positions: global set
+  const presetPosIds = await client.smembers("preset_pseudo_positions")
+  for (const posId of presetPosIds) {
+    const key = `preset_pseudo_position:${posId}`
+    const data = await client.hgetall(key)
+    if (data && Object.keys(data).length > 0) {
+      const pnl = computePnl(data)
+      const ts = getTimestamp(data)
+      if (ts) {
+        positions.push({
+          id: posId,
+          connectionId: data.connection_id,
+          pnl,
+          timestamp: ts,
+          status: data.status,
+        })
+      }
+    }
+  }
+
+  return positions
+}
+
+// Compute stats for a given set of positions
+function computeStats(positions: PositionData[]) {
+  const total = positions.length
+  if (total === 0) {
+    return { total: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, totalProfit: 0 }
+  }
+
+  let wins = 0
+  let losses = 0
+  let sumPos = 0
+  let sumNeg = 0
+  let totalProfit = 0
+
+  for (const p of positions) {
+    const pnlVal = p.pnl
+    totalProfit += pnlVal
+    if (pnlVal > 0) {
+      wins++
+      sumPos += pnlVal
+    } else if (pnlVal < 0) {
+      losses++
+      sumNeg += Math.abs(pnlVal)
+    }
+  }
+
+  const winRate = total > 0 ? wins / total : 0
+  const profitFactor = sumNeg > 0 ? sumPos / sumNeg : 0
+
+  return { total, wins, losses, winRate, profitFactor, totalProfit }
+}
 
 export async function GET() {
   try {
     console.log("[v0] Fetching detailed trading statistics")
-    
-    const connections = loadConnections()
-    const enabledConnections = connections.filter((c) => c.is_enabled && c.is_live_trade)
-    
-    // Return comprehensive stats with last250, last50, and last32h
-    try {
-      // Get last 250 positions
-      const last250 = await query(
-        `SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins,
-          SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END) as losses,
-          COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) / COUNT(*), 0) as winRate,
-          COALESCE(SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) / NULLIF(SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END), 0), 0) as profitFactor,
-          COALESCE(SUM(pnl), 0) as totalProfit
-         FROM pseudo_positions ORDER BY created_at DESC LIMIT 250`
-      )
-      
-      // Get last 50 positions
-      const last50 = await query(
-        `SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins,
-          SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END) as losses,
-          COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) / COUNT(*), 0) as winRate,
-          COALESCE(SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) / NULLIF(SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END), 0), 0) as profitFactor,
-          COALESCE(SUM(pnl), 0) as totalProfit
-         FROM pseudo_positions ORDER BY created_at DESC LIMIT 50`
-      )
-      
-      // Get last 32 hours
-      const last32h = await query(
-        `SELECT 
-          COUNT(*) as total,
-          COALESCE(SUM(pnl), 0) as totalProfit,
-          COALESCE(SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) / NULLIF(SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END), 0), 0) as profitFactor
-         FROM pseudo_positions WHERE created_at >= datetime('now', '-32 hours')`
-      )
-      
-      const l250 = (last250 as any[])[0]
-      const l50 = (last50 as any[])[0]
-      const l32 = (last32h as any[])[0]
-      
-      console.log(`[v0] Trading stats - Last250: ${l250?.total || 0}, Last50: ${l50?.total || 0}, Last32h: ${l32?.total || 0}`)
-      
-      return NextResponse.json({
-        last250: {
-          total: l250?.total || 0,
-          wins: l250?.wins || 0,
-          losses: l250?.losses || 0,
-          winRate: l250?.winRate || 0,
-          profitFactor: l250?.profitFactor || 0,
-          totalProfit: l250?.totalProfit || 0,
-        },
-        last50: {
-          total: l50?.total || 0,
-          wins: l50?.wins || 0,
-          losses: l50?.losses || 0,
-          winRate: l50?.winRate || 0,
-          profitFactor: l50?.profitFactor || 0,
-          totalProfit: l50?.totalProfit || 0,
-        },
-        last32h: {
-          total: l32?.total || 0,
-          totalProfit: l32?.totalProfit || 0,
-          profitFactor: l32?.profitFactor || 0,
-        },
-      })
-    } catch (dbError) {
-      console.warn("[v0] Database stats not available:", dbError)
-      return NextResponse.json({
-        last250: { total: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, totalProfit: 0 },
-        last50: { total: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, totalProfit: 0 },
-        last32h: { total: 0, totalProfit: 0, profitFactor: 0 },
-      })
-    }
+    const allPositions = await getAllPseudoPositions()
+
+    // Sort by timestamp descending (most recent first)
+    allPositions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+
+    // Last 250
+    const last250 = computeStats(allPositions.slice(0, 250))
+    // Last 50
+    const last50 = computeStats(allPositions.slice(0, 50))
+
+    // Last 32 hours
+    const cutoff32h = new Date(Date.now() - 32 * 60 * 60 * 1000)
+    const last32hPositions = allPositions.filter(p => p.timestamp >= cutoff32h)
+    const last32h = computeStats(last32hPositions)
+    // Note: last32h stats only include total, totalProfit, profitFactor (ignore wins/losses per original)
+    // Original query returned total, totalProfit, profitFactor
+
+    return NextResponse.json({
+      last250: {
+        total: last250.total,
+        wins: last250.wins,
+        losses: last250.losses,
+        winRate: last250.winRate,
+        profitFactor: last250.profitFactor,
+        totalProfit: last250.totalProfit,
+      },
+      last50: {
+        total: last50.total,
+        wins: last50.wins,
+        losses: last50.losses,
+        winRate: last50.winRate,
+        profitFactor: last50.profitFactor,
+        totalProfit: last50.totalProfit,
+      },
+      last32h: {
+        total: last32h.total,
+        totalProfit: last32h.totalProfit,
+        profitFactor: last32h.profitFactor,
+      },
+    })
   } catch (error) {
     console.error("[v0] Failed to fetch stats:", error)
-    await SystemLogger.logError(error, "api", "GET /api/trading/stats")
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 })
   }
 }

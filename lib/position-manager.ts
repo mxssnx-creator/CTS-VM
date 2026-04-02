@@ -1,5 +1,5 @@
 // Position management for trading bot
-import { query } from "./db"
+import { getRedisClient } from "./redis-db"
 import { OrderExecutor } from "./order-executor"
 
 export interface PositionUpdate {
@@ -15,49 +15,46 @@ export class PositionManager {
   }
 
   async updatePosition(positionId: number, update: PositionUpdate): Promise<void> {
-    await query(
-      `UPDATE positions
-       SET current_price = $1,
-           unrealized_pnl = $2,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [update.current_price, update.unrealized_pnl, positionId],
-    )
+    const client = getRedisClient()
+    const key = `position:${positionId}`
+    await client.hset(key, {
+      current_price: String(update.current_price),
+      unrealized_pnl: String(update.unrealized_pnl),
+      updated_at: new Date().toISOString()
+    })
   }
 
   async checkStopLossAndTakeProfit(positionId: number): Promise<boolean> {
-    const positions = await query(
-      `SELECT p.*, tp.symbol, pf.user_id
-       FROM positions p
-       JOIN trading_pairs tp ON p.trading_pair_id = tp.id
-       JOIN portfolios pf ON p.portfolio_id = pf.id
-       WHERE p.id = $1 AND p.status = $2`,
-      [positionId, "open"],
-    )
+    const client = getRedisClient()
+    const position = await client.hgetall(`position:${positionId}`)
 
-    if (positions.length === 0) return false
+    if (!position || position.status !== "open") return false
 
-    const position = positions[0]
+    const currentPrice = parseFloat(position.current_price || "0")
+    const stopLoss = position.stop_loss ? parseFloat(position.stop_price || "0") : null
+    const takeProfit = position.take_profit ? parseFloat(position.take_price || "0") : null
+    const positionType = position.position_type || "long"
+
     let shouldClose = false
     let closeReason = ""
 
     // Check stop loss
-    if (position.stop_loss) {
-      if (position.position_type === "long" && position.current_price <= position.stop_loss) {
+    if (stopLoss !== null) {
+      if (positionType === "long" && currentPrice <= stopLoss) {
         shouldClose = true
         closeReason = "Stop loss triggered"
-      } else if (position.position_type === "short" && position.current_price >= position.stop_loss) {
+      } else if (positionType === "short" && currentPrice >= stopLoss) {
         shouldClose = true
         closeReason = "Stop loss triggered"
       }
     }
 
     // Check take profit
-    if (position.take_profit && !shouldClose) {
-      if (position.position_type === "long" && position.current_price >= position.take_profit) {
+    if (takeProfit !== null && !shouldClose) {
+      if (positionType === "long" && currentPrice >= takeProfit) {
         shouldClose = true
         closeReason = "Take profit triggered"
-      } else if (position.position_type === "short" && position.current_price <= position.take_profit) {
+      } else if (positionType === "short" && currentPrice <= takeProfit) {
         shouldClose = true
         closeReason = "Take profit triggered"
       }
@@ -65,7 +62,8 @@ export class PositionManager {
 
     if (shouldClose) {
       console.log(`[v0] ${closeReason} for position ${positionId}`)
-      await this.closePosition(positionId, position.user_id, closeReason)
+      const userIdNum = parseInt(position.user_id || "0", 10)
+      await this.closePosition(positionId, userIdNum, closeReason)
       return true
     }
 
@@ -74,11 +72,10 @@ export class PositionManager {
 
   async closePosition(positionId: number, userId: number, reason: string): Promise<boolean> {
     try {
-      const positions = await query(`SELECT * FROM positions WHERE id = $1 AND status = $2`, [positionId, "open"])
+      const client = getRedisClient()
+      const position = await client.hgetall(`position:${positionId}`)
 
-      if (positions.length === 0) return false
-
-      const position = positions[0]
+      if (!position || position.status !== "open") return false
 
       // Calculate realized PnL
       const realizedPnl = this.calculateRealizedPnL(position)
@@ -87,12 +84,12 @@ export class PositionManager {
       const closeSide = position.position_type === "long" ? "sell" : "buy"
 
       const executionResult = await this.orderExecutor.executeOrder({
-        user_id: userId,
-        portfolio_id: position.portfolio_id,
-        trading_pair_id: position.trading_pair_id,
+        user_id: parseInt(position.user_id || "0", 10),
+        portfolio_id: parseInt(position.portfolio_id || "0", 10),
+        trading_pair_id: parseInt(position.trading_pair_id || "0", 10),
         order_type: "market",
         side: closeSide,
-        quantity: position.quantity,
+        quantity: parseFloat(position.quantity || "0"),
       })
 
       if (!executionResult.success) {
@@ -101,17 +98,14 @@ export class PositionManager {
       }
 
       // Update position status
-      await query(
-        `UPDATE positions
-         SET status = $1,
-             realized_pnl = $2,
-             closed_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        ["closed", realizedPnl, positionId],
-      )
+      await client.hset(`position:${positionId}`, {
+        status: "closed",
+        realized_pnl: String(realizedPnl),
+        closed_at: new Date().toISOString()
+      })
 
       // Update portfolio value
-      await this.updatePortfolioValue(position.portfolio_id, realizedPnl)
+      await this.updatePortfolioValue(parseInt(position.portfolio_id || "0", 10), realizedPnl)
 
       console.log(`[v0] Position ${positionId} closed. Reason: ${reason}. PnL: ${realizedPnl}`)
 
@@ -123,60 +117,89 @@ export class PositionManager {
   }
 
   private calculateRealizedPnL(position: any): number {
-    const priceDiff = position.current_price - position.entry_price
+    const entryPrice = parseFloat(position.entry_price || "0")
+    const currentPrice = parseFloat(position.current_price || "0")
+    const quantity = parseFloat(position.quantity || "0")
+    const leverage = parseFloat(position.leverage || "1")
+    const priceDiff = currentPrice - entryPrice
     const multiplier = position.position_type === "long" ? 1 : -1
 
-    return priceDiff * position.quantity * multiplier * position.leverage
+    return priceDiff * quantity * multiplier * leverage
   }
 
   private async updatePortfolioValue(portfolioId: number, pnlChange: number): Promise<void> {
-    await query(
-      `UPDATE portfolios
-       SET total_value = total_value + $1,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [pnlChange, portfolioId],
-    )
+    const client = getRedisClient()
+    const key = `portfolio:${portfolioId}`
+    const portfolio = await client.hgetall(key)
+    const currentValue = parseFloat(portfolio?.total_value || "0")
+    await client.hset(key, {
+      total_value: String(currentValue + pnlChange),
+      updated_at: new Date().toISOString()
+    })
   }
 
   async getOpenPositions(portfolioId: number) {
-    return await query(
-      `SELECT p.*, tp.symbol, tp.base_currency, tp.quote_currency
-       FROM positions p
-       JOIN trading_pairs tp ON p.trading_pair_id = tp.id
-       WHERE p.portfolio_id = $1 AND p.status = $2
-       ORDER BY p.opened_at DESC`,
-      [portfolioId, "open"],
-    )
+    const client = getRedisClient()
+    const positionIds = await client.smembers("positions") || []
+    const positions = []
+
+    for (const id of positionIds) {
+      const pos = await client.hgetall(`position:${id}`)
+      if (pos && pos.portfolio_id === String(portfolioId) && pos.status === "open") {
+        // Fetch trading pair data
+        const tradingPairId = pos.trading_pair_id
+        if (tradingPairId) {
+          const tp = await client.hgetall(`trading_pair:${tradingPairId}`)
+          positions.push({
+            ...pos,
+            id,
+            symbol: tp?.symbol || null,
+            base_currency: tp?.base_currency || null,
+            quote_currency: tp?.quote_currency || null,
+            opened_at: pos.opened_at || null
+          } as any)
+        }
+      }
+    }
+
+    // Sort by opened_at descending
+    return positions.sort((a: any, b: any) => {
+      const aTime = a.opened_at ? new Date(a.opened_at).getTime() : 0
+      const bTime = b.opened_at ? new Date(b.opened_at).getTime() : 0
+      return bTime - aTime
+    })
   }
 
   async updateTrailingStop(positionId: number): Promise<void> {
-    const positions = await query("SELECT * FROM positions WHERE id = $1 AND status = $2", [positionId, "open"])
+    const client = getRedisClient()
+    const position = await client.hgetall(`position:${positionId}`)
 
-    if (positions.length === 0) return
-
-    const position = positions[0]
+    if (!position || position.status !== "open") return
 
     // Only update if position has unrealized profit
-    if (position.unrealized_pnl <= 0) return
+    const unrealizedPnl = parseFloat(position.unrealized_pnl || "0")
+    if (unrealizedPnl <= 0) return
 
-    // Calculate new trailing stop based on current price
-    const trailingStopDistance = position.entry_price * 0.02 // 2% trailing
+    const entryPrice = parseFloat(position.entry_price || "0")
+    const trailingStopDistance = entryPrice * 0.02 // 2% trailing
+    const currentPrice = parseFloat(position.current_price || "0")
 
     let newStopLoss: number
 
     if (position.position_type === "long") {
-      newStopLoss = position.current_price - trailingStopDistance
+      newStopLoss = currentPrice - trailingStopDistance
       // Only update if new stop loss is higher than current
-      if (!position.stop_loss || newStopLoss > position.stop_loss) {
-        await query("UPDATE positions SET stop_loss = $1 WHERE id = $2", [newStopLoss, positionId])
+      const currentStopLoss = position.stop_loss ? parseFloat(position.stop_loss || "0") : null
+      if (currentStopLoss === null || newStopLoss > currentStopLoss) {
+        await client.hset(`position:${positionId}`, { stop_loss: String(newStopLoss) })
         console.log(`[v0] Updated trailing stop for position ${positionId} to ${newStopLoss}`)
       }
     } else {
-      newStopLoss = position.current_price + trailingStopDistance
+      newStopLoss = currentPrice + trailingStopDistance
       // Only update if new stop loss is lower than current
-      if (!position.stop_loss || newStopLoss < position.stop_loss) {
-        await query("UPDATE positions SET stop_loss = $1 WHERE id = $2", [newStopLoss, positionId])
+      const currentStopLoss = position.stop_loss ? parseFloat(position.stop_loss || "0") : null
+      if (currentStopLoss === null || newStopLoss < currentStopLoss) {
+        await client.hset(`position:${positionId}`, { stop_loss: String(newStopLoss) })
         console.log(`[v0] Updated trailing stop for position ${positionId} to ${newStopLoss}`)
       }
     }

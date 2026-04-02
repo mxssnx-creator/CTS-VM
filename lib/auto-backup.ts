@@ -1,9 +1,10 @@
 import * as fs from "fs"
 import * as path from "path"
+import { getClient, initRedis } from "./redis-db"
 
 /**
  * AutoBackupManager
- * Handles automatic database backups on a schedule
+ * Handles automatic Redis backups on a schedule
  */
 export class AutoBackupManager {
   private backupInterval?: NodeJS.Timeout
@@ -11,7 +12,6 @@ export class AutoBackupManager {
   private backupPath: string
 
   constructor() {
-    // Use /tmp for serverless or backups/ for local
     this.backupPath = process.env.BACKUP_PATH || "/tmp/backups"
     this.ensureBackupDirectory()
   }
@@ -64,7 +64,7 @@ export class AutoBackupManager {
   }
 
   /**
-   * Perform a database backup
+   * Perform a database backup from Redis
    */
   async performBackup(): Promise<{ success: boolean; filename?: string; size?: number; error?: string }> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
@@ -74,29 +74,149 @@ export class AutoBackupManager {
     console.log(`[v0] Performing database backup: ${filename}`)
 
     try {
+      // Initialize Redis connection
+      await initRedis()
+      const client = getClient()
+
       // Backup critical tables
       const backupData: Record<string, any[]> = {}
 
-      const criticalTables = [
-        "exchange_connections",
-        "system_settings",
-        "trade_engine_state",
-        "preset_types",
-        "preset_configurations",
-        "preset_strategies",
-        "indications",
-        "indications_direction",
-        "indications_move",
-        "indications_active",
-        "strategies_trailing",
-        "orders",
-        "trades"
-      ]
+      // Define backup mappings: table name -> { setKey, hashPrefix, type }
+      const backupMappings: Record<string, { setKey?: string; hashPrefix?: string; type: 'set' | 'key' | 'complex' }> = {
+        // exchange_connections -> connections set + connection:${id} hashes
+        exchange_connections: { setKey: "connections", hashPrefix: "connection:", type: "set" },
+        
+        // system_settings -> settings:* keys (fetch all settings keys)
+        system_settings: { type: "key" },
+        
+        // trade_engine_state -> single key "trade_engine_state"
+        trade_engine_state: { type: "key" },
+        
+        // preset_types -> preset_types:all set + preset_type:${id} hashes
+        preset_types: { setKey: "preset_types:all", hashPrefix: "preset_type:", type: "set" },
+        
+        // preset_configurations (preset_configuration_sets) -> settings:preset_config_set:* keys
+        preset_configurations: { type: "key" },
+        
+        // preset_strategies -> strategies:all set + strategies:${id} hashes
+        preset_strategies: { setKey: "strategies:all", hashPrefix: "strategies:", type: "set" },
+        
+        // indications -> indications set + indications:${id} hashes (legacy)
+        indications: { setKey: "indications", hashPrefix: "indications:", type: "set" },
+        
+        // indications_direction -> indications_direction set + indications_direction:${id} hashes
+        indications_direction: { setKey: "indications_direction", hashPrefix: "indications_direction:", type: "set" },
+        
+        // indications_move -> indications_move set + indications_move:${id} hashes
+        indications_move: { setKey: "indications_move", hashPrefix: "indications_move:", type: "set" },
+        
+        // indications_active -> indications_active set + indications_active:${id} hashes
+        indications_active: { setKey: "indications_active", hashPrefix: "indications_active:", type: "set" },
+        
+        // strategies_trailing -> strategies_trailing set + strategies_trailing:${id} hashes
+        strategies_trailing: { setKey: "strategies_trailing", hashPrefix: "strategies_trailing:", type: "set" },
+        
+        // orders -> need to fetch from all orders:${connectionId} sets
+        orders: { type: "complex" },
+        
+        // trades -> trades set + trade:${id} hashes
+        trades: { setKey: "trades", hashPrefix: "trade:", type: "set" }
+      }
 
-      for (const table of criticalTables) {
+      for (const [table, config] of Object.entries(backupMappings)) {
         try {
-          const { query } = await import("./db")
-          const data = await query(`SELECT * FROM ${table}`, [])
+          let data: any[] = []
+
+          switch (config.type) {
+            case "set": {
+              if (!config.setKey || !config.hashPrefix) {
+                console.warn(`[v0] Invalid set config for table ${table}`)
+                break
+              }
+              const ids = await client.smembers(config.setKey)
+              if (ids && ids.length > 0) {
+                const fetchPromises = ids.map(async (id: string) => {
+                  const hash = await client.hgetall(`${config.hashPrefix}${id}`)
+                  if (hash && Object.keys(hash).length > 0) {
+                    return { ...hash, id }
+                  }
+                  return null
+                })
+                const results = await Promise.all(fetchPromises)
+                data = results.filter(r => r !== null)
+              }
+              break
+            }
+
+            case "key": {
+              // For settings-type data stored as individual keys
+              let keys: string[] = []
+              if (table === "system_settings") {
+                keys = await client.keys("settings:*")
+              } else if (table === "preset_configurations") {
+                keys = await client.keys("settings:preset_config_set:*")
+              } else if (table === "trade_engine_state") {
+                // Check both global and per-connection keys
+                const global = await client.keys("trade_engine_state")
+                const perConn = await client.keys("trade_engine_state:*")
+                keys = [...global, ...perConn]
+              }
+              
+              if (keys && keys.length > 0) {
+                const fetchPromises = keys.map(async (key: string) => {
+                  const value = await client.get(key)
+                  if (value !== null) {
+                    // Try to parse JSON, otherwise store as string
+                    try {
+                      const parsed = JSON.parse(value)
+                      return { key, value: parsed }
+                    } catch {
+                      return { key, value }
+                    }
+                  }
+                  return null
+                })
+                const results = await Promise.all(fetchPromises)
+                data = results.filter(r => r !== null)
+              }
+              break
+            }
+
+            case "complex": {
+              if (table === "orders") {
+                // Orders are stored in per-connection sets: orders:${connectionId}
+                // First get all connections
+                const connIds = await client.smembers("connections")
+                const orderItems: Array<{ oid: string; connId: string }> = []
+                
+                if (connIds && connIds.length > 0) {
+                  // For each connection, get its orders set
+                  for (const connId of connIds) {
+                    const orderIds = await client.smembers(`orders:${connId}`)
+                    if (orderIds && orderIds.length > 0) {
+                      for (const oid of orderIds) {
+                        orderItems.push({ oid, connId })
+                      }
+                    }
+                  }
+                }
+
+                if (orderItems.length > 0) {
+                  const fetchPromises = orderItems.map(async ({ oid, connId }) => {
+                    const hash = await client.hgetall(`order:${connId}:${oid}`)
+                    if (hash && Object.keys(hash).length > 0) {
+                      return { ...hash, id: oid, connection_id: connId }
+                    }
+                    return null
+                  })
+                  const results = await Promise.all(fetchPromises)
+                  data = results.filter(r => r !== null)
+                }
+              }
+              break
+            }
+          }
+
           backupData[table] = data
           console.log(`[v0] Backed up ${table}: ${data.length} records`)
         } catch (error) {

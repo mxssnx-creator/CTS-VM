@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getRedisClient } from "@/lib/redis-db"
+import { getRedisClient, getRedisStats } from "@/lib/redis-db"
 
 export async function GET() {
   try {
@@ -9,15 +9,15 @@ export async function GET() {
     const keys = await client.keys("*")
     const keyCount = keys ? keys.length : 0
     
-    // Get Redis info
-    const info = await client.info()
+    // Get Redis stats
+    const stats = getRedisStats()
     
     return NextResponse.json({
       success: true,
       database_type: "redis",
       key_count: keyCount,
       keys_sample: keys ? keys.slice(0, 50) : [],
-      info: info
+      info: stats
     })
   } catch (error: any) {
     return NextResponse.json(

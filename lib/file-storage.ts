@@ -739,60 +739,129 @@ function getDefaultCommonIndicationSettings(): CommonIndicationSettings {
 
 export async function exportConnectionsToFile() {
   try {
-    const { query } = await import("@/lib/db")
-    const connections = await query(`
-      SELECT 
-        ec.*,
-        vc.base_volume_factor as volume_factor
-      FROM exchange_connections ec
-      LEFT JOIN volume_configuration vc ON ec.id = vc.connection_id
-      WHERE ec.is_active = true
-      ORDER BY ec.created_at DESC
-    `)
-
+    const { getAllConnections } = await import("@/lib/redis-db")
+    const rawConnections = await getAllConnections()
+    
+    // Convert raw string records to proper Connection objects
+    const connections = rawConnections.map(raw => {
+      // Start with all original fields (preserve any extra fields)
+      const conn: any = { ...raw }
+      
+      // Helper to safely parse numbers
+      const parseNum = (val: any, fallback?: number): number => {
+        if (val === undefined || val === null || val === '') return fallback ?? 0
+        const num = Number(val)
+        return isNaN(num) ? (fallback ?? 0) : num
+      }
+      
+      // Helper to safely parse booleans
+      const parseBool = (val: any, fallback: boolean = false): boolean => {
+        if (val === undefined || val === null || val === '') return fallback
+        return val === '1' || val === 'true' || val === true
+      }
+      
+      // Required numeric fields
+      conn.user_id = parseNum(raw.user_id, 1)
+      conn.exchange_id = (() => {
+        const val = raw.exchange_id
+        if (val === undefined || val === '' || val === null) return null
+        const num = Number(val)
+        return isNaN(num) ? null : num
+      })()
+      
+      // Required boolean fields
+      conn.is_testnet = parseBool(raw.is_testnet)
+      conn.is_enabled = parseBool(raw.is_enabled)
+      conn.is_live_trade = parseBool(raw.is_live_trade)
+      conn.is_preset_trade = parseBool(raw.is_preset_trade)
+      conn.is_active = parseBool(raw.is_active)
+      conn.is_predefined = parseBool(raw.is_predefined)
+      
+      // Optional numeric
+      if (raw.volume_factor !== undefined) {
+        const vf = parseNum(raw.volume_factor)
+        conn.volume_factor = isNaN(vf) ? undefined : vf
+      }
+      
+      // JSON fields
+      if (raw.connection_settings) {
+        try {
+          conn.connection_settings = JSON.parse(raw.connection_settings)
+        } catch {
+          // keep as string if parse fails
+        }
+      }
+      if (raw.last_test_log) {
+        try {
+          conn.last_test_log = JSON.parse(raw.last_test_log)
+        } catch {
+          // keep as string
+        }
+      }
+      if (raw.last_test_balance !== undefined && raw.last_test_balance !== '') {
+        const lb = Number(raw.last_test_balance)
+        conn.last_test_balance = isNaN(lb) ? undefined : lb
+      }
+      
+      // Ensure required date strings exist
+      if (!conn.created_at) conn.created_at = new Date().toISOString()
+      if (!conn.updated_at) conn.updated_at = new Date().toISOString()
+      
+      return conn
+    })
+    
+    // Sort by created_at descending
+    connections.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    
     if (connections.length > 0) {
       saveConnections(connections)
-      console.log("[v0] Exported", connections.length, "connections to file")
+      console.log("[v0] Exported", connections.length, "connections from Redis")
     }
   } catch (error) {
-    console.error("[v0] Error exporting connections:", error)
+    console.error("[v0] Error exporting connections from Redis:", error)
   }
 }
 
 export async function exportSettingsToFile() {
   try {
-    const { query } = await import("@/lib/db")
-    const settings = await query(`
-      SELECT category, subcategory, key, value, value_type
-      FROM system_settings
-      ORDER BY category, subcategory, key
-    `)
-
+    const { getRedisClient } = await import("@/lib/redis-db")
+    const client = getRedisClient()
+    
+    // Get all settings keys matching the pattern
+    const settingKeys = await client.keys("settings:*")
+    
     const settingsObject: Settings = {}
-    for (const setting of settings) {
-      const key = setting.key
-      let value = setting.value
-
-      if (setting.value_type === "number") {
-        value = Number.parseFloat(value)
-      } else if (setting.value_type === "boolean") {
-        value = value === "true"
-      } else if (setting.value_type === "json") {
+    
+    if (settingKeys && settingKeys.length > 0) {
+      // Fetch all values in parallel
+      const values = await Promise.all(settingKeys.map(k => client.get(k)))
+      
+      for (let i = 0; i < settingKeys.length; i++) {
+        const fullKey = settingKeys[i]
+        const value = values[i]
+        if (!value) continue
+        
+        // Strip "settings:" prefix to get the setting key
+        const key = fullKey.replace(/^settings:/, '')
+        
         try {
-          value = JSON.parse(value)
+          // Parse JSON to get proper type (number, boolean, object, etc.)
+          const parsed = JSON.parse(value)
+          settingsObject[key] = parsed
         } catch {
-          value = setting.value
+          // If not JSON, store as string
+          settingsObject[key] = value
         }
       }
-
-      settingsObject[key] = value
     }
-
+    
     if (Object.keys(settingsObject).length > 0) {
       saveSettings(settingsObject)
-      console.log("[v0] Exported", Object.keys(settingsObject).length, "settings to file")
+      console.log("[v0] Exported", Object.keys(settingsObject).length, "settings from Redis")
+    } else {
+      console.log("[v0] No settings found in Redis")
     }
   } catch (error) {
-    console.error("[v0] Error exporting settings:", error)
+    console.error("[v0] Error exporting settings from Redis:", error)
   }
 }

@@ -1,22 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
-import DatabaseManager from "@/lib/database"
-const db = DatabaseManager.getInstance()
-import { EntityTypes } from "@/lib/core/entity-types"
+import { RedisService } from "@/lib/redis-service"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
 
-    const results = await db.query(EntityTypes.PRESET_TYPE, {
-      filters: [{ field: 'id', operator: '=', value: id }]
-    })
-    const presetType = results[0]
+    const presetType = await RedisService.getPresetType(id)
 
     if (!presetType) {
       return NextResponse.json({ error: "Preset type not found" }, { status: 404 })
     }
 
-    return NextResponse.json(presetType)
+    return NextResponse.json({
+      ...presetType,
+      block_enabled: presetType.block_enabled === "1",
+      block_only: presetType.block_only === "1",
+      dca_enabled: presetType.dca_enabled === "1",
+      dca_only: presetType.dca_only === "1",
+      auto_evaluate: presetType.auto_evaluate !== "0",
+      is_active: presetType.is_active === "1",
+      max_positions_per_indication: Number(presetType.max_positions_per_indication || 1),
+      max_positions_per_direction: Number(presetType.max_positions_per_direction || 1),
+      max_positions_per_range: Number(presetType.max_positions_per_range || 1),
+      timeout_per_indication: Number(presetType.timeout_per_indication || 5),
+      timeout_after_position: Number(presetType.timeout_after_position || 10),
+      evaluation_interval_hours: Number(presetType.evaluation_interval_hours || 3),
+    })
   } catch (error) {
     console.error("[v0] Failed to fetch preset type:", error)
     return NextResponse.json({ error: "Failed to fetch preset type" }, { status: 500 })
@@ -28,32 +37,49 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const body = await request.json()
 
-    const updates = {
+    const updatesRaw: Record<string, any> = {
       name: body.name,
       description: body.description || null,
       preset_trade_type: body.preset_trade_type || "automatic",
-      max_positions_per_indication: body.max_positions_per_indication || 1,
-      max_positions_per_direction: body.max_positions_per_direction || 1,
-      max_positions_per_range: body.max_positions_per_range || 1,
-      timeout_per_indication: body.timeout_per_indication || 5,
-      timeout_after_position: body.timeout_after_position || 10,
-      block_enabled: !!body.block_enabled,
-      block_only: !!body.block_only,
-      dca_enabled: !!body.dca_enabled,
-      dca_only: !!body.dca_only,
-      auto_evaluate: body.auto_evaluate !== false,
-      evaluation_interval_hours: body.evaluation_interval_hours || 3,
-      is_active: body.is_active !== false,
+      max_positions_per_indication: body.max_positions_per_indication !== undefined ? String(body.max_positions_per_indication) : undefined,
+      max_positions_per_direction: body.max_positions_per_direction !== undefined ? String(body.max_positions_per_direction) : undefined,
+      max_positions_per_range: body.max_positions_per_range !== undefined ? String(body.max_positions_per_range) : undefined,
+      timeout_per_indication: body.timeout_per_indication !== undefined ? String(body.timeout_per_indication) : undefined,
+      timeout_after_position: body.timeout_after_position !== undefined ? String(body.timeout_after_position) : undefined,
+      block_enabled: body.block_enabled !== undefined ? (body.block_enabled ? "1" : "0") : undefined,
+      block_only: body.block_only !== undefined ? (body.block_only ? "1" : "0") : undefined,
+      dca_enabled: body.dca_enabled !== undefined ? (body.dca_enabled ? "1" : "0") : undefined,
+      dca_only: body.dca_only !== undefined ? (body.dca_only ? "1" : "0") : undefined,
+      auto_evaluate: body.auto_evaluate !== false ? "1" : "0",
+      evaluation_interval_hours: body.evaluation_interval_hours !== undefined ? String(body.evaluation_interval_hours) : undefined,
+      is_active: body.is_active !== false ? "1" : "0",
+      updated_at: new Date().toISOString(),
     }
 
-    await db.update(EntityTypes.PRESET_TYPE, id, updates)
+    // Remove undefined values
+    const updates = Object.fromEntries(Object.entries(updatesRaw).filter(([_, v]) => v !== undefined))
 
-    const results = await db.query(EntityTypes.PRESET_TYPE, {
-      filters: [{ field: 'id', operator: '=', value: id }]
+    const presetType = await RedisService.updatePresetType(id, updates)
+
+    if (!presetType) {
+      return NextResponse.json({ error: "Preset type not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({
+      ...presetType,
+      block_enabled: presetType.block_enabled === "1",
+      block_only: presetType.block_only === "1",
+      dca_enabled: presetType.dca_enabled === "1",
+      dca_only: presetType.dca_only === "1",
+      auto_evaluate: presetType.auto_evaluate !== "0",
+      is_active: presetType.is_active === "1",
+      max_positions_per_indication: Number(presetType.max_positions_per_indication || 1),
+      max_positions_per_direction: Number(presetType.max_positions_per_direction || 1),
+      max_positions_per_range: Number(presetType.max_positions_per_range || 1),
+      timeout_per_indication: Number(presetType.timeout_per_indication || 5),
+      timeout_after_position: Number(presetType.timeout_after_position || 10),
+      evaluation_interval_hours: Number(presetType.evaluation_interval_hours || 3),
     })
-    const presetType = results[0]
-
-    return NextResponse.json(presetType)
   } catch (error) {
     console.error("[v0] Failed to update preset type:", error)
     return NextResponse.json({ error: "Failed to update preset type" }, { status: 500 })
@@ -64,7 +90,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id } = await params
 
-    await db.delete(EntityTypes.PRESET_TYPE, id)
+    const presetType = await RedisService.deletePresetType(id)
+
+    if (!presetType) {
+      return NextResponse.json({ error: "Preset type not found" }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

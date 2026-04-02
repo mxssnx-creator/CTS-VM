@@ -6,16 +6,14 @@ export async function POST() {
   try {
     console.log("[v0] Force reinitialization of Redis database...")
 
-    const { initRedis } = await import("@/lib/redis-db")
-    const { getRedisClient } = await import("@/lib/redis-db")
+    const { initRedis, flushAll } = await import("@/lib/redis-db")
     const { runMigrations } = await import("@/lib/redis-migrations")
 
     const startTime = Date.now()
 
-    // Clear all Redis keys
+    // Clear all Redis data
     console.log("[v0] Clearing all Redis data...")
-    const client = getRedisClient()
-    await client.flushDb()
+    await flushAll()
 
     // Re-initialize
     console.log("[v0] Re-initializing Redis...")

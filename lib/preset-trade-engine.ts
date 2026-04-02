@@ -1,12 +1,12 @@
 /**
- * Production-Ready Preset Trade Engine
+ * Production-Ready Preset Trade Engine (Redis Version)
  * Supports both MAIN INDICATIONS (Direction/Move/Active/Optimal) and
  * COMMON INDICATORS (RSI, MACD, Bollinger, ParabolicSAR, ADX, ATR, etc.)
  * Wider TP/SL ranges for short-term trading (starting from factor 2)
  * Optimized for performance, rate limits, and production trading
  */
 
-import { query, execute, getDatabaseType } from "@/lib/db"
+import { getRedisClient } from "@/lib/db"
 import { TechnicalIndicators, calculateIndicators, type IndicatorConfig, type IndicatorSignal } from "./indicators"
 import { IndicationEngine } from "./indications"
 import { INDICATION_CATEGORIES, type IndicationCategory } from "./constants/types"
@@ -364,47 +364,25 @@ export class PresetTradeEngine {
    * Initialize engine state
    */
   private async initializeEngineState(config: PresetTradeEngineConfig): Promise<void> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO preset_trade_engine_state (
-        connection_id, preset_id, mode, status, config, started_at
-      ) VALUES (
-        ?, ?, ?, 'running',
-        ?, CURRENT_TIMESTAMP
-      )
-      ON CONFLICT (connection_id, preset_id)
-      DO UPDATE SET
-        status = 'running',
-        mode = ?,
-        config = ?,
-        started_at = CURRENT_TIMESTAMP,
-        stopped_at = NULL
-    `
-      : `
-      INSERT INTO preset_trade_engine_state (
-        connection_id, preset_id, mode, status, config, started_at
-      ) VALUES (
-        $1, $2, $3, 'running',
-        $4, CURRENT_TIMESTAMP
-      )
-      ON CONFLICT (connection_id, preset_id)
-      DO UPDATE SET
-        status = 'running',
-        mode = $5,
-        config = $6,
-        started_at = CURRENT_TIMESTAMP,
-        stopped_at = NULL
-    `
+    const client = getRedisClient()
+    const stateKey = `preset_trade_engine_state:${this.connectionId}:${this.presetId}`
+    
+    const stateData = {
+      connection_id: this.connectionId,
+      preset_id: this.presetId,
+      mode: config.mode,
+      status: "running",
+      config: JSON.stringify(config),
+      started_at: new Date().toISOString(),
+      stopped_at: "",
+    }
 
-    await execute(queryText, [
-      this.connectionId,
-      this.presetId,
-      config.mode,
-      JSON.stringify(config),
-      config.mode,
-      JSON.stringify(config),
-    ])
+    await client.hset(stateKey, Object.fromEntries(
+      Object.entries(stateData).map(([k, v]) => [k, String(v)])
+    ))
+
+    // Add to engine state index
+    await client.sadd("preset_trade_engine_states", `${this.connectionId}:${this.presetId}`)
   }
 
   /**
@@ -777,20 +755,18 @@ export class PresetTradeEngine {
    * Process strategies and create Main pseudo positions
    */
   private async processStrategies(symbols: string[], config: PresetTradeEngineConfig): Promise<void> {
-    const placeholder = getDatabaseType() === "sqlite" ? "?" : "$1"
-    const placeholder2 = getDatabaseType() === "sqlite" ? "?" : "$2"
+    const client = getRedisClient()
 
-    const basePositions = await query<any>(
-      `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = ${placeholder}
-        AND preset_id = ${placeholder2}
-        AND type = 'base'
-        AND status = 'active'
-      ORDER BY symbol, created_at DESC
-    `,
-      [this.connectionId, this.presetId],
-    )
+    // Get all base positions for this connection/preset
+    const basePositionsIds = await client.smembers(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:base:status:active`)
+    
+    const basePositions: any[] = []
+    for (const id of basePositionsIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.status === 'active' && pos.type === 'base') {
+        basePositions.push({ ...pos, id })
+      }
+    }
 
     // Group by symbol
     const positionsBySymbol = this.groupBy(basePositions, "symbol")
@@ -799,7 +775,7 @@ export class PresetTradeEngine {
     for (const [symbol, positions] of Object.entries(positionsBySymbol)) {
       try {
         // Validate and create Main pseudo positions
-        const validatedPositions = positions.filter((p: any) => p.profit_factor >= config.minProfitFactor)
+        const validatedPositions = positions.filter((p: any) => Number(p.profit_factor) >= config.minProfitFactor)
 
         // Check position cooldown (20 seconds)
         const lastPosition = await this.getLastClosedPosition(symbol)
@@ -815,52 +791,38 @@ export class PresetTradeEngine {
 
         // Create Main pseudo positions from validated Base positions
         for (const basePosition of validatedPositions.slice(0, 10)) {
-          const isSqlite = getDatabaseType() === "sqlite"
-          const queryText = isSqlite
-            ? `
-            INSERT INTO preset_pseudo_positions (
-              id, connection_id, preset_id, symbol, type,
-              indication_type, indication_range,
-              takeprofit_factor, stoploss_ratio,
-              trailing_enabled, trail_start, trail_stop,
-              entry_price, current_price, profit_factor,
-              position_cost, base_position_id, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT DO NOTHING
-          `
-            : `
-            INSERT INTO preset_pseudo_positions (
-              id, connection_id, preset_id, symbol, type,
-              indication_type, indication_range,
-              takeprofit_factor, stoploss_ratio,
-              trailing_enabled, trail_start, trail_stop,
-              entry_price, current_price, profit_factor,
-              position_cost, base_position_id, status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-            ON CONFLICT DO NOTHING
-          `
+          const mainId = this.generateId()
+          const mainPosition = {
+            id: mainId,
+            connection_id: this.connectionId,
+            preset_id: this.presetId,
+            symbol: basePosition.symbol,
+            type: "main",
+            indication_type: basePosition.indication_type,
+            indication_range: basePosition.indication_range,
+            takeprofit_factor: basePosition.takeprofit_factor,
+            stoploss_ratio: basePosition.stoploss_ratio,
+            trailing_enabled: basePosition.trailing_enabled,
+            trail_start: basePosition.trail_start,
+            trail_stop: basePosition.trail_stop,
+            entry_price: basePosition.entry_price,
+            current_price: basePosition.current_price,
+            profit_factor: basePosition.profit_factor,
+            position_cost: basePosition.position_cost,
+            base_position_id: basePosition.id,
+            status: "active",
+            created_at: new Date().toISOString(),
+          }
 
-          await execute(queryText, [
-            this.generateId(),
-            this.connectionId,
-            this.presetId,
-            basePosition.symbol,
-            "main",
-            basePosition.indication_type,
-            basePosition.indication_range,
-            basePosition.takeprofit_factor,
-            basePosition.stoploss_ratio,
-            basePosition.trailing_enabled,
-            basePosition.trail_start,
-            basePosition.trail_stop,
-            basePosition.entry_price,
-            basePosition.current_price,
-            basePosition.profit_factor,
-            basePosition.position_cost,
-            basePosition.id,
-            "active",
-            new Date().toISOString(),
-          ])
+          await client.hset(`preset_pseudo_position:${mainId}`, Object.fromEntries(
+            Object.entries(mainPosition).map(([k, v]) => [k, String(v)])
+          ))
+
+          // Add to indexes
+          await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}`, mainId)
+          await client.sadd(`preset_pseudo_positions:symbol:${basePosition.symbol}`, mainId)
+          await client.sadd(`preset_pseudo_positions:type:main`, mainId)
+          await client.sadd(`preset_pseudo_positions:status:active`, mainId)
         }
       } catch (error) {
         console.error(`[v0] Error processing strategies for ${symbol}:`, error)
@@ -872,18 +834,18 @@ export class PresetTradeEngine {
    * Manage pseudo positions (update, validate, close)
    */
   private async managePseudoPositions(config: PresetTradeEngineConfig): Promise<void> {
-    const placeholder = getDatabaseType() === "sqlite" ? "?" : "$1"
-    const placeholder2 = getDatabaseType() === "sqlite" ? "?" : "$2"
+    const client = getRedisClient()
 
-    const activePositions = await query<any>(
-      `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = ${placeholder}
-        AND preset_id = ${placeholder2}
-        AND status = 'active'
-    `,
-      [this.connectionId, this.presetId],
-    )
+    // Get all active positions for this connection/preset
+    const activePositionsIds = await client.smembers(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:status:active`)
+    
+    const activePositions: any[] = []
+    for (const id of activePositionsIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.status === 'active') {
+        activePositions.push({ ...pos, id })
+      }
+    }
 
     // Update with current prices (batch)
     const symbols = [...new Set(activePositions.map((p: any) => p.symbol))]
@@ -900,8 +862,8 @@ export class PresetTradeEngine {
             if (!currentPrice) return
 
             // Update profit factor
-            const priceDiff = currentPrice - position.entry_price
-            const profitFactor = priceDiff / (position.entry_price * position.position_cost)
+            const priceDiff = currentPrice - Number(position.entry_price)
+            const profitFactor = priceDiff / (Number(position.entry_price) * Number(position.position_cost))
 
             // Check exit conditions
             const shouldClose = this.checkExitConditions(position, currentPrice, profitFactor)
@@ -909,20 +871,11 @@ export class PresetTradeEngine {
             if (shouldClose) {
               await this.closePosition(position, currentPrice, profitFactor)
             } else {
-              const isSqlite = getDatabaseType() === "sqlite"
-              const queryText = isSqlite
-                ? `
-                UPDATE preset_pseudo_positions
-                SET current_price = ?, profit_factor = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-              `
-                : `
-                UPDATE preset_pseudo_positions
-                SET current_price = $1, profit_factor = $2, updated_at = CURRENT_TIMESTAMP
-                WHERE id = $3
-              `
-
-              await execute(queryText, [currentPrice, profitFactor, position.id])
+              await client.hset(`preset_pseudo_position:${position.id}`, {
+                current_price: String(currentPrice),
+                profit_factor: String(profitFactor),
+                updated_at: new Date().toISOString(),
+              })
             }
 
             // Validate Main positions for Real trading
@@ -968,20 +921,18 @@ export class PresetTradeEngine {
    * Batched API calls for rate limit compliance
    */
   private async processRealInterval(): Promise<void> {
-    const placeholder = getDatabaseType() === "sqlite" ? "?" : "$1"
-    const placeholder2 = getDatabaseType() === "sqlite" ? "?" : "$2"
+    const client = getRedisClient()
 
-    const realPositions = await query<any>(
-      `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = ${placeholder}
-        AND preset_id = ${placeholder2}
-        AND type = 'real'
-        AND status = 'active'
-      LIMIT 50
-    `,
-      [this.connectionId, this.presetId],
-    )
+    // Get all real active positions for this connection/preset
+    const realPositionsIds = await client.smembers(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:real:status:active`)
+    
+    const realPositions: any[] = []
+    for (const id of realPositionsIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.type === 'real' && pos.status === 'active') {
+        realPositions.push({ ...pos, id })
+      }
+    }
 
     if (realPositions.length === 0) return
 
@@ -1010,23 +961,54 @@ export class PresetTradeEngine {
   // ============ HELPER METHODS ============
 
   private async getSettings(): Promise<Record<string, string>> {
-    const result = await query<any>(`SELECT key, value FROM system_settings`)
-    return Object.fromEntries(result.map((r: any) => [r.key, r.value]))
+    const client = getRedisClient()
+    const keys = await client.keys("settings:*")
+    const settings: Record<string, string> = {}
+
+    for (const key of keys) {
+      const value = await client.get(key)
+      if (value !== null) {
+        const settingKey = key.replace("settings:", "")
+        settings[settingKey] = value
+      }
+    }
+
+    return settings
   }
 
   private async getTopSymbolsByMarketCap(count: number): Promise<string[]> {
-    const placeholder = getDatabaseType() === "sqlite" ? "?" : "$1"
-    const result = await query<any>(
-      `
-      SELECT symbol FROM market_data
-      WHERE timestamp > NOW() - INTERVAL '24 hours'
-      GROUP BY symbol
-      ORDER BY SUM(volume * price) DESC
-      LIMIT ${placeholder}
-    `,
-      [count],
-    )
-    return result.map((r: any) => r.symbol)
+    const client = getRedisClient()
+    
+    // Get all symbols from market_data keys
+    const marketDataKeys = await client.keys("market_data:*")
+    const symbolAggregates = new Map<string, { volume: number; price: number }>()
+
+    for (const key of marketDataKeys) {
+      const dataStr = await client.get(key)
+      if (dataStr) {
+        try {
+          const data = JSON.parse(dataStr)
+          const symbol = key.split(":")[1]
+          if (symbol) {
+            const existing = symbolAggregates.get(symbol) || { volume: 0, price: 0 }
+            symbolAggregates.set(symbol, {
+              volume: existing.volume + (data.volume || 0),
+              price: data.price || 0,
+            })
+          }
+        } catch (e) {
+          // Skip invalid data
+        }
+      }
+    }
+
+    // Sort by volume * price (market cap approximation)
+    const sorted = Array.from(symbolAggregates.entries())
+      .sort((a, b) => (b[1].volume * b[1].price) - (a[1].volume * a[1].price))
+      .slice(0, count)
+      .map(([symbol]) => symbol)
+
+    return sorted
   }
 
   private createBatches<T>(items: T[], batchSize: number): T[][] {
@@ -1063,127 +1045,96 @@ export class PresetTradeEngine {
   private async storeHistoricalData(symbol: string, data: any[]): Promise<void> {
     if (data.length === 0) return
 
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO market_data (connection_id, symbol, price, timestamp)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT DO NOTHING
-    `
-      : `
-      INSERT INTO market_data (connection_id, symbol, price, timestamp)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT DO NOTHING
-    `
+    const client = getRedisClient()
+    const zsetKey = `market_data:${this.connectionId}:${symbol}`
 
     for (const d of data) {
-      await execute(queryText, [this.connectionId, symbol, d.close, d.timestamp])
+      const timestamp = d.timestamp
+      const value = JSON.stringify(d)
+      await client.zadd(zsetKey, timestamp, value)
     }
   }
 
   private async getRecentPrices(symbol: string, count: number): Promise<number[]> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      SELECT price FROM market_data
-      WHERE connection_id = ? AND symbol = ?
-      ORDER BY timestamp DESC
-      LIMIT ?
-    `
-      : `
-      SELECT price FROM market_data
-      WHERE connection_id = $1 AND symbol = $2
-      ORDER BY timestamp DESC
-      LIMIT $3
-    `
+    const client = getRedisClient()
+    const zsetKey = `market_data:${this.connectionId}:${symbol}`
 
-    const result = await query<any>(queryText, [this.connectionId, symbol, count])
-    return result.map((r: any) => r.price).reverse()
+    // Get the most recent entries (highest scores)
+    const recentData = await client.zrevrange(zsetKey, 0, count - 1)
+    
+    // Parse and extract prices
+    const prices = recentData
+      .map((dataStr: string) => {
+        try {
+          const data = JSON.parse(dataStr)
+          return data.price
+        } catch {
+          return null
+        }
+      })
+      .filter((price: number | null) => price !== null)
+      .reverse() // Reverse to get oldest first like the original query
+
+    return prices as number[]
   }
 
   private async getCurrentPrices(symbols: string[]): Promise<Map<string, number>> {
-    const isSqlite = getDatabaseType() === "sqlite"
+    const client = getRedisClient()
+    const prices = new Map<string, number>()
 
-    let result: any[] = []
-
-    if (isSqlite) {
-      const placeholders = symbols.map(() => "?").join(",")
-      result = await query<any>(
-        `
-        SELECT symbol, price
-        FROM market_data
-        WHERE connection_id = ? AND symbol IN (${placeholders})
-        ORDER BY symbol, timestamp DESC
-      `,
-        [this.connectionId, ...symbols],
-      )
-    } else {
-      result = await query<any>(
-        `
-      SELECT DISTINCT ON (symbol) symbol, price
-      FROM market_data
-      WHERE connection_id = $1 AND symbol = ANY($2)
-      ORDER BY symbol, timestamp DESC
-    `,
-        [this.connectionId, symbols],
-      )
+    for (const symbol of symbols) {
+      const zsetKey = `market_data:${this.connectionId}:${symbol}`
+      // Get the most recent price (highest score)
+      const recentData = await client.zrevrange(zsetKey, 0, 0)
+      
+      if (recentData.length > 0) {
+        try {
+          const data = JSON.parse(recentData[0])
+          prices.set(symbol, data.price)
+        } catch {
+          // Skip if parsing fails
+        }
+      }
     }
 
-    return new Map(result.map((r: any) => [r.symbol, r.price]))
+    return prices
   }
 
   private async batchInsertPseudoPositions(positions: any[]): Promise<void> {
     if (positions.length === 0) return
 
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        direction, strength, indicators, takeprofit_factor, stoploss_ratio,
-        trailing_enabled, trail_start, trail_stop,
-        entry_price, current_price, profit_factor, position_cost,
-        status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT DO NOTHING
-    `
-      : `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        direction, strength, indicators, takeprofit_factor, stoploss_ratio,
-        trailing_enabled, trail_start, trail_stop,
-        entry_price, current_price, profit_factor, position_cost,
-        status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-      ON CONFLICT DO NOTHING
-    `
+    const client = getRedisClient()
 
-    const batches = this.createBatches(positions, 50)
+    // Index key for all positions
+    const allPositionsKey = `preset_pseudo_positions:all`
+    const connectionKey = `preset_pseudo_positions:connection:${this.connectionId}`
+    const presetKey = `preset_pseudo_positions:preset:${this.presetId}`
 
-    for (const batch of batches) {
-      for (const p of batch) {
-        await execute(queryText, [
-          p.id,
-          p.connection_id,
-          p.preset_id,
-          p.symbol,
-          p.type,
-          p.direction,
-          p.strength,
-          p.indicators,
-          p.takeprofit_factor,
-          p.stoploss_ratio,
-          p.trailing_enabled,
-          p.trail_start,
-          p.trail_stop,
-          p.entry_price,
-          p.current_price,
-          p.profit_factor,
-          p.position_cost,
-          p.status,
-          p.created_at,
-        ])
-      }
+    for (const p of positions) {
+      const id = p.id
+      const positionKey = `preset_pseudo_position:${id}`
+
+      // Store the position hash
+      await client.hset(positionKey, Object.fromEntries(
+        Object.entries(p).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+      ))
+
+      // Add to global indexes
+      await client.sadd(allPositionsKey, id)
+      await client.sadd(connectionKey, id)
+      await client.sadd(presetKey, id)
+
+      // Add to symbol-specific index
+      await client.sadd(`preset_pseudo_positions:symbol:${p.symbol}`, id)
+
+      // Add to type index
+      await client.sadd(`preset_pseudo_positions:type:${p.type}`, id)
+
+      // Add to status index
+      await client.sadd(`preset_pseudo_positions:status:${p.status}`, id)
+
+      // Add to combined indexes for query optimization
+      await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:${p.type}:status:${p.status}`, id)
     }
   }
 
@@ -1209,111 +1160,101 @@ export class PresetTradeEngine {
   }
 
   private async closePosition(position: any, currentPrice: number, profitFactor: number): Promise<void> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      UPDATE preset_pseudo_positions
-      SET status = 'closed',
-          current_price = ?,
-          profit_factor = ?,
-          closed_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `
-      : `
-      UPDATE preset_pseudo_positions
-      SET status = 'closed',
-          current_price = $1,
-          profit_factor = $2,
-          closed_at = CURRENT_TIMESTAMP
-      WHERE id = $3
-    `
+    const client = getRedisClient()
+    const positionKey = `preset_pseudo_position:${position.id}`
 
-    await execute(queryText, [currentPrice, profitFactor, position.id])
+    await client.hset(positionKey, {
+      status: "closed",
+      current_price: String(currentPrice),
+      profit_factor: String(profitFactor),
+      closed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    // Remove from active status index
+    await client.srem(`preset_pseudo_positions:status:active`, position.id)
+    await client.srem(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:status:active`, position.id)
+
+    // Add to closed status index
+    await client.sadd(`preset_pseudo_positions:status:closed`, position.id)
+    await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:status:closed`, position.id)
   }
 
   private async getLastClosedPosition(symbol: string): Promise<any> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = ? AND preset_id = ? AND symbol = ? AND status = 'closed'
-      ORDER BY closed_at DESC
-      LIMIT 1
-    `
-      : `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = $1 AND preset_id = $2 AND symbol = $3 AND status = 'closed'
-      ORDER BY closed_at DESC
-      LIMIT 1
-    `
+    const client = getRedisClient()
 
-    const result = await query<any>(queryText, [this.connectionId, this.presetId, symbol])
-    return result[0]
+    // Get all closed positions for this connection/preset/symbol
+    const indexKey = `preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:symbol:${symbol}:status:closed`
+    const positionIds = await client.smembers(indexKey)
+
+    if (positionIds.length === 0) {
+      return null
+    }
+
+    // Sort by closed_at and get the most recent
+    let lastPosition: any = null
+    let lastClosedAt = 0
+
+    for (const id of positionIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.status === 'closed') {
+        const closedAt = new Date(pos.closed_at).getTime()
+        if (closedAt > lastClosedAt) {
+          lastClosedAt = closedAt
+          lastPosition = { ...pos, id }
+        }
+      }
+    }
+
+    return lastPosition
   }
 
   private async getActivePositionCount(symbol: string): Promise<number> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      SELECT COUNT(*) as count FROM preset_pseudo_positions
-      WHERE connection_id = ? AND preset_id = ? AND symbol = ? AND type = 'main' AND status = 'active'
-    `
-      : `
-      SELECT COUNT(*) as count FROM preset_pseudo_positions
-      WHERE connection_id = $1 AND preset_id = $2 AND symbol = $3 AND type = 'main' AND status = 'active'
-    `
+    const client = getRedisClient()
 
-    const result = await query<any>(queryText, [this.connectionId, this.presetId, symbol])
-    return Number(result[0]?.count || 0)
+    // Count main active positions for this connection/preset/symbol
+    const indexKey = `preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:symbol:${symbol}:type:main:status:active`
+    const count = await client.scard(indexKey)
+
+    return count
   }
 
   private async validateForRealTrading(position: any, config: PresetTradeEngineConfig): Promise<void> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        indication_type, indication_range,
-        takeprofit_factor, stoploss_ratio,
-        trailing_enabled, trail_start, trail_stop,
-        entry_price, current_price, profit_factor,
-        position_cost, main_position_id, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT DO NOTHING
-    `
-      : `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        indication_type, indication_range,
-        takeprofit_factor, stoploss_ratio,
-        trailing_enabled, trail_start, trail_stop,
-        entry_price, current_price, profit_factor,
-        position_cost, main_position_id, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-      ON CONFLICT DO NOTHING
-    `
+    const client = getRedisClient()
+    const realId = this.generateId()
 
-    await execute(queryText, [
-      this.generateId(),
-      this.connectionId,
-      this.presetId,
-      position.symbol,
-      "real",
-      position.indication_type,
-      position.indication_range,
-      position.takeprofit_factor,
-      position.stoploss_ratio,
-      position.trailing_enabled,
-      position.trail_start,
-      position.trail_stop,
-      position.entry_price,
-      position.current_price,
-      position.profit_factor,
-      position.position_cost,
-      position.id,
-      "active",
-      new Date().toISOString(),
-    ])
+    const realPosition = {
+      id: realId,
+      connection_id: this.connectionId,
+      preset_id: this.presetId,
+      symbol: position.symbol,
+      type: "real",
+      indication_type: position.indication_type,
+      indication_range: position.indication_range,
+      takeprofit_factor: position.takeprofit_factor,
+      stoploss_ratio: position.stoploss_ratio,
+      trailing_enabled: position.trailing_enabled,
+      trail_start: position.trail_start,
+      trail_stop: position.trail_stop,
+      entry_price: position.entry_price,
+      current_price: position.current_price,
+      profit_factor: position.profit_factor,
+      position_cost: position.position_cost,
+      main_position_id: position.id,
+      status: "active",
+      created_at: new Date().toISOString(),
+    }
+
+    await client.hset(`preset_pseudo_position:${realId}`, Object.fromEntries(
+      Object.entries(realPosition).map(([k, v]) => [k, String(v)])
+    ))
+
+    // Add to indexes
+    await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}`, realId)
+    await client.sadd(`preset_pseudo_positions:symbol:${position.symbol}`, realId)
+    await client.sadd(`preset_pseudo_positions:type:real`, realId)
+    await client.sadd(`preset_pseudo_positions:status:active`, realId)
+    await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:real:status:active`, realId)
   }
 
   private async fetchExchangePositions(): Promise<any[]> {
@@ -1323,39 +1264,35 @@ export class PresetTradeEngine {
   }
 
   private async batchUpdateRealPositions(updates: any[]): Promise<void> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      UPDATE preset_pseudo_positions
-      SET current_price = ?, profit_loss = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `
-      : `
-      UPDATE preset_pseudo_positions
-      SET current_price = $1, profit_loss = $2, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
-    `
+    const client = getRedisClient()
 
     for (const update of updates) {
-      await execute(queryText, [update.currentPrice, update.profitLoss, update.id])
+      const positionKey = `preset_pseudo_position:${update.id}`
+      await client.hset(positionKey, {
+        current_price: String(update.currentPrice),
+        profit_loss: String(update.profitLoss),
+        updated_at: new Date().toISOString(),
+      })
     }
   }
 
   private async logMetrics(symbolCount: number, duration: number): Promise<void> {
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO preset_engine_metrics (
-        connection_id, preset_id, symbol_count, duration_ms, timestamp
-      ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `
-      : `
-      INSERT INTO preset_engine_metrics (
-        connection_id, preset_id, symbol_count, duration_ms, timestamp
-      ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-    `
+    const client = getRedisClient()
+    const metricsLogKey = `preset_engine_metrics:log`
+    
+    const metric = {
+      connection_id: this.connectionId,
+      preset_id: this.presetId,
+      symbol_count: symbolCount,
+      duration_ms: duration,
+      timestamp: new Date().toISOString(),
+    }
 
-    await execute(queryText, [this.connectionId, this.presetId, symbolCount, duration])
+    // Store as a list entry (JSON string)
+    await client.rpush(metricsLogKey, JSON.stringify(metric))
+
+    // Keep only last 1000 entries
+    await client.ltrim(metricsLogKey, -1000, -1)
   }
 
   /**
@@ -1443,69 +1380,58 @@ export class PresetTradeEngine {
   private async savePositions(positions: any[]): Promise<void> {
     if (positions.length === 0) return
 
-    const isSqlite = getDatabaseType() === "sqlite"
-    const queryText = isSqlite
-      ? `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        indication_category, indication_type, indication_step,
-        direction, strength, entry_price, takeprofit_factor, stoploss_ratio,
-        position_cost, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT DO NOTHING
-    `
-      : `
-      INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_id, symbol, type,
-        indication_category, indication_type, indication_step,
-        direction, strength, entry_price, takeprofit_factor, stoploss_ratio,
-        position_cost, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      ON CONFLICT DO NOTHING
-    `
+    const client = getRedisClient()
 
-    const batches = this.createBatches(positions, 50)
+    // Index keys
+    const allPositionsKey = `preset_pseudo_positions:all`
+    const connectionKey = `preset_pseudo_positions:connection:${this.connectionId}`
+    const presetKey = `preset_pseudo_positions:preset:${this.presetId}`
 
-    for (const batch of batches) {
-      for (const p of batch) {
-        await execute(queryText, [
-          p.id,
-          p.connection_id,
-          p.preset_id,
-          p.symbol,
-          p.type,
-          p.indication_category,
-          p.indication_type,
-          p.indication_step,
-          p.direction,
-          p.strength,
-          p.entry_price,
-          p.takeprofit_factor,
-          p.stoploss_ratio,
-          p.position_cost,
-          p.created_at,
-        ])
+    for (const p of positions) {
+      const id = p.id
+      const positionKey = `preset_pseudo_position:${id}`
+
+      await client.hset(positionKey, Object.fromEntries(
+        Object.entries(p).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+      ))
+
+      // Add to global indexes
+      await client.sadd(allPositionsKey, id)
+      await client.sadd(connectionKey, id)
+      await client.sadd(presetKey, id)
+
+      // Add to symbol-specific index
+      await client.sadd(`preset_pseudo_positions:symbol:${p.symbol}`, id)
+
+      // Add to type and category indexes
+      await client.sadd(`preset_pseudo_positions:type:${p.type}`, id)
+      if (p.indication_category) {
+        await client.sadd(`preset_pseudo_positions:category:${p.indication_category}`, id)
       }
+
+      // Add to status index
+      await client.sadd(`preset_pseudo_positions:status:active`, id)
+
+      // Add to combined indexes
+      await client.sadd(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:${p.type}:status:active`, id)
     }
   }
 
   private async processRealPositions(config: PresetTradeEngineConfig): Promise<void> {
     console.log("[v0] Processing real positions")
 
-    const placeholder = getDatabaseType() === "sqlite" ? "?" : "$1"
-    const placeholder2 = getDatabaseType() === "sqlite" ? "?" : "$2"
+    const client = getRedisClient()
 
-    const realPositions = await query<any>(
-      `
-      SELECT * FROM preset_pseudo_positions
-      WHERE connection_id = ${placeholder}
-        AND preset_id = ${placeholder2}
-        AND type = 'real'
-        AND status = 'active'
-      LIMIT 50
-    `,
-      [this.connectionId, this.presetId],
-    )
+    // Get all real active positions for this connection/preset
+    const realPositionsIds = await client.smembers(`preset_pseudo_positions:connection:${this.connectionId}:preset:${this.presetId}:type:real:status:active`)
+    
+    const realPositions: any[] = []
+    for (const id of realPositionsIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.type === 'real' && pos.status === 'active') {
+        realPositions.push({ ...pos, id })
+      }
+    }
 
     if (realPositions.length === 0) return
 

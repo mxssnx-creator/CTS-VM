@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { query, execute } from "@/lib/db"
+import { getRedisClient, initRedis } from "@/lib/redis-db"
 
 export async function POST(request: NextRequest) {
   try {
+    await initRedis()
+    const client = getRedisClient()
+
     const formData = await request.formData()
     const file = formData.get("file") as File
 
@@ -19,43 +22,45 @@ export async function POST(request: NextRequest) {
 
     let settingsCount = 0
     for (const setting of importData.settings) {
-      await execute(
-        `
-        INSERT OR REPLACE INTO system_settings (key, value, category, subcategory, description, updated_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-      `,
-        [setting.key, setting.value, setting.category, setting.subcategory, setting.description],
-      )
+      const key = `settings:${setting.key}`
+      const value = typeof setting.value === "string" ? setting.value : JSON.stringify(setting.value)
+      await client.set(key, value)
       settingsCount++
     }
 
     let connectionsCount = 0
     if (importData.connections) {
       for (const conn of importData.connections) {
-        const existing = await query(`SELECT id FROM exchange_connections WHERE exchange = ? AND name = ?`, [
-          conn.exchange,
-          conn.name,
-        ])
+        // Check if connection exists by exchange+name - need to check all connections
+        const connIds = await client.smembers("connections") || []
+        let exists = false
+        for (const id of connIds) {
+          const existing = await client.hgetall(`connection:${id}`)
+          if (existing && existing.exchange === conn.exchange && existing.name === conn.name) {
+            exists = true
+            break
+          }
+        }
 
-        if (existing.length === 0) {
-          await execute(
-            `
-            INSERT INTO exchange_connections (
-              name, exchange, api_type, connection_method,
-              margin_mode, position_type, testnet, settings
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-            [
-              conn.name,
-              conn.exchange,
-              conn.api_type,
-              conn.connection_method,
-              conn.margin_mode,
-              conn.position_type,
-              conn.testnet,
-              JSON.stringify(conn.settings),
-            ],
-          )
+        if (!exists) {
+          const connId = `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          const connData: Record<string, string> = {
+            id: connId,
+            name: conn.name,
+            exchange: conn.exchange,
+            api_type: conn.api_type || "standard",
+            connection_method: conn.connection_method || "api",
+            margin_mode: conn.margin_mode || "isolated",
+            position_type: conn.position_type || "both",
+            is_enabled: "0", // disabled by default
+            is_active: "0",
+            is_testnet: conn.testnet ? "1" : "0",
+            settings: JSON.stringify(conn.settings || {}),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          await client.hset(`connection:${connId}`, connData)
+          await client.sadd("connections", connId)
           connectionsCount++
         }
       }

@@ -5,8 +5,18 @@
  * Updates every 1 second for all active configurations
  */
 
-import { sql, query, getDatabaseType } from "@/lib/db"
+import { getRedisClient } from "@/lib/redis-db"
 import type { PresetCoordinationResult } from "@/lib/types-preset-coordination"
+
+function convertToString(value: any): string {
+  // Handle booleans specially
+  if (value === true) return "1"
+  if (value === false) return "0"
+  // Handle null/undefined
+  if (value === null || value === undefined) return ""
+  // Convert everything else to string
+  return String(value)
+}
 
 export interface PseudoPositionConfig {
   id: string
@@ -135,7 +145,7 @@ export class PresetPseudoPositionManager {
       leverage,
     }
 
-    // Store in database
+    // Store in Redis
     await this.storePseudoPosition(config)
 
     // Add to active tracking
@@ -300,101 +310,131 @@ export class PresetPseudoPositionManager {
   }
 
   /**
-   * Load active pseudo positions from database
+   * Load active pseudo positions from Redis
    */
   private async loadActivePseudoPositions(): Promise<void> {
-    const positions = await sql<any>`SELECT * FROM preset_pseudo_positions 
-       WHERE connection_id = ${this.connectionId} 
-         AND preset_type_id = ${this.presetTypeId} 
-         AND status = 'open'`
+    const client = getRedisClient()
+    
+    // Get all position IDs for this connection and preset from index sets
+    const [connectionIds, presetIds] = await Promise.all([
+      client.smembers(`preset_pseudo_positions:connection:${this.connectionId}`),
+      client.smembers(`preset_pseudo_positions:preset:${this.presetTypeId}`)
+    ])
 
-    for (const pos of positions) {
-      const config: PseudoPositionConfig = {
-        id: pos.id,
-        symbol: pos.symbol,
-        direction: pos.direction,
-        indicationType: pos.indication_type,
-        indicationParams: JSON.parse(pos.indication_params),
-        takeprofitFactor: pos.takeprofit_factor,
-        stoplossRatio: pos.stoploss_ratio,
-        trailingEnabled: pos.trailing_enabled,
-        trailStart: pos.trail_start,
-        trailStop: pos.trail_stop,
-        entryPrice: pos.entry_price,
-        quantity: pos.quantity,
-        leverage: pos.leverage,
+    // Find intersection of both sets (positions that belong to both this connection and preset)
+    const positionIds = connectionIds.filter(id => presetIds.includes(id))
+
+    // Load each position and filter by status = open
+    for (const id of positionIds) {
+      const pos = await client.hgetall(`preset_pseudo_position:${id}`)
+      if (pos && pos.status === "open") {
+        const config: PseudoPositionConfig = {
+          id: pos.id,
+          symbol: pos.symbol,
+          direction: pos.direction as "long" | "short",
+          indicationType: pos.indication_type,
+          indicationParams: JSON.parse(pos.indication_params || "{}"),
+          takeprofitFactor: parseFloat(pos.takeprofit_factor),
+          stoplossRatio: parseFloat(pos.stoploss_ratio),
+          trailingEnabled: pos.trailing_enabled === "1",
+          trailStart: pos.trail_start ? parseFloat(pos.trail_start) : null,
+          trailStop: pos.trail_stop ? parseFloat(pos.trail_stop) : null,
+          entryPrice: parseFloat(pos.entry_price),
+          quantity: parseFloat(pos.quantity),
+          leverage: parseFloat(pos.leverage),
+        }
+
+        this.activePseudoPositions.set(config.id, config)
+
+        const configKey = this.getConfigKeyFromPosition(config)
+        if (!this.positionsByConfig.has(configKey)) {
+          this.positionsByConfig.set(configKey, new Set())
+        }
+        this.positionsByConfig.get(configKey)!.add(config.id)
       }
-
-      this.activePseudoPositions.set(config.id, config)
-
-      const configKey = this.getConfigKeyFromPosition(config)
-      if (!this.positionsByConfig.has(configKey)) {
-        this.positionsByConfig.set(configKey, new Set())
-      }
-      this.positionsByConfig.get(configKey)!.add(config.id)
     }
 
     console.log(`[v0] Loaded ${this.activePseudoPositions.size} active pseudo positions`)
   }
 
   /**
-   * Store new pseudo position in database
+   * Store new pseudo position in Redis
    */
   private async storePseudoPosition(config: PseudoPositionConfig): Promise<void> {
-    await sql`INSERT INTO preset_pseudo_positions (
-        id, connection_id, preset_type_id, symbol, direction,
-        indication_type, indication_params,
-        takeprofit_factor, stoploss_ratio,
-        trailing_enabled, trail_start, trail_stop,
-        entry_price, quantity, leverage,
-        status, opened_at, created_at
-      ) VALUES (
-        ${config.id},
-        ${this.connectionId},
-        ${this.presetTypeId},
-        ${config.symbol},
-        ${config.direction},
-        ${config.indicationType},
-        ${JSON.stringify(config.indicationParams)},
-        ${config.takeprofitFactor},
-        ${config.stoplossRatio},
-        ${config.trailingEnabled ? 1 : 0},
-        ${config.trailStart},
-        ${config.trailStop},
-        ${config.entryPrice},
-        ${config.quantity},
-        ${config.leverage},
-        'open',
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-      )`
+    const client = getRedisClient()
+    const key = `preset_pseudo_position:${config.id}`
+
+    const data: Record<string, string> = {
+      id: config.id,
+      connection_id: this.connectionId,
+      preset_type_id: this.presetTypeId,
+      symbol: config.symbol,
+      direction: config.direction,
+      indication_type: config.indicationType,
+      indication_params: JSON.stringify(config.indicationParams),
+      takeprofit_factor: String(config.takeprofitFactor),
+      stoploss_ratio: String(config.stoplossRatio),
+      trailing_enabled: config.trailingEnabled ? "1" : "0",
+      trail_start: config.trailStart !== null ? String(config.trailStart) : "",
+      trail_stop: config.trailStop !== null ? String(config.trailStop) : "",
+      entry_price: String(config.entryPrice),
+      quantity: String(config.quantity),
+      leverage: String(config.leverage),
+      status: "open",
+      opened_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    await client.hset(key, data)
+
+    // Add to index sets
+    await Promise.all([
+      client.sadd("preset_pseudo_positions", config.id),
+      client.sadd(`preset_pseudo_positions:connection:${this.connectionId}`, config.id),
+      client.sadd(`preset_pseudo_positions:preset:${this.presetTypeId}`, config.id),
+      client.sadd(`preset_pseudo_positions:status:open`, config.id),
+    ])
   }
 
   /**
-   * Update pseudo position in database
+   * Update pseudo position in Redis
    */
   private async updatePseudoPosition(positionId: string, update: PseudoPositionUpdate): Promise<void> {
-    await sql`UPDATE preset_pseudo_positions 
-       SET current_price = ${update.currentPrice},
-           unrealized_pnl = ${update.unrealizedPnl},
-           unrealized_pnl_percent = ${update.unrealizedPnlPercent},
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ${positionId}`
+    const client = getRedisClient()
+    const key = `preset_pseudo_position:${positionId}`
+
+    const data: Record<string, string> = {
+      current_price: String(update.currentPrice),
+      unrealized_pnl: String(update.unrealizedPnl),
+      unrealized_pnl_percent: String(update.unrealizedPnlPercent),
+      updated_at: new Date().toISOString(),
+    }
+
+    await client.hset(key, data)
   }
 
   /**
-   * Close pseudo position in database
+   * Close pseudo position in Redis
    */
   private async closePseudoPosition(positionId: string, update: PseudoPositionUpdate): Promise<void> {
-    await sql`UPDATE preset_pseudo_positions 
-       SET status = 'closed',
-           exit_price = ${update.exitPrice},
-           exit_reason = ${update.exitReason},
-           realized_pnl = ${update.unrealizedPnl},
-           realized_pnl_percent = ${update.unrealizedPnlPercent},
-           closed_at = ${update.closedAt},
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ${positionId}`
+    const client = getRedisClient()
+    const key = `preset_pseudo_position:${positionId}`
+
+    const data: Record<string, string> = {
+      status: "closed",
+      exit_price: String(update.exitPrice),
+      exit_reason: update.exitReason || "",
+      realized_pnl: String(update.unrealizedPnl),
+      realized_pnl_percent: String(update.unrealizedPnlPercent),
+      closed_at: update.closedAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    await client.hset(key, data)
+
+    // Remove from open status index
+    await client.srem(`preset_pseudo_positions:status:open`, positionId)
   }
 
   /**
@@ -407,20 +447,14 @@ export class PresetPseudoPositionManager {
 
     const priceMap = new Map<string, number>()
 
-    const dbType = getDatabaseType()
-    const connectionParam = dbType === "sqlite" ? "?" : "$1"
-    const placeholders = symbols.map((_, index) => (dbType === "sqlite" ? "?" : `$${index + 2}`)).join(",")
+    // Use getMarketData from redis-db for each symbol
+    const { getMarketData } = await import("@/lib/redis-db")
 
-    const queryText = `SELECT symbol, price FROM market_data 
-       WHERE connection_id = ${connectionParam}
-         AND symbol IN (${placeholders})
-       GROUP BY symbol
-       HAVING timestamp = MAX(timestamp)`
-
-    const prices = await query(queryText, [this.connectionId, ...symbols])
-
-    for (const row of prices) {
-      priceMap.set(row.symbol, row.price)
+    for (const symbol of symbols) {
+      const data = await getMarketData(symbol)
+      if (data && data.price) {
+        priceMap.set(symbol, parseFloat(data.price))
+      }
     }
 
     return priceMap

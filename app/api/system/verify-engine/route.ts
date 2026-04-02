@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db"
 import { getSettings } from "@/lib/redis-persistence"
 import { getGlobalTradeEngineCoordinator } from "@/lib/trade-engine"
 import { loadConnections } from "@/lib/file-storage"
+import { getConnectionTrades, getConnectionPositions, getIndications, getRedisClient } from "@/lib/redis-db"
 
 /**
  * Comprehensive Engine System Verification
@@ -40,26 +40,23 @@ export async function GET() {
       const cycleData = await getSettings(`engine:indications:stats`)
       const strategyStats = await getSettings(`engine:strategies:stats`)
 
-      // Get database metrics
-      const trades = await query<{ count: number }>(
-        "SELECT COUNT(*) as count FROM trades WHERE connection_id = ?",
-        [conn.id]
-      ).catch(() => [{ count: 0 }])
+      // Get database metrics from Redis
+      const tradesList = await getConnectionTrades(conn.id)
+      const tradesCount = tradesList.length
 
-      const pseudoPositions = await query<{ count: number }>(
-        "SELECT COUNT(*) as count FROM pseudo_positions WHERE connection_id = ?",
-        [conn.id]
-      ).catch(() => [{ count: 0 }])
+      const positionsList = await getConnectionPositions(conn.id)
+      const positionsCount = positionsList.length
 
-      const indications = await query<{ count: number }>(
-        "SELECT COUNT(*) as count FROM indications WHERE connection_id = ? AND created_at > datetime('now', '-1 hour')",
-        [conn.id]
-      ).catch(() => [{ count: 0 }])
+      // Get indications and filter by last hour
+      const allIndications = await getIndications(conn.id)
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+      const recentIndicationsCount = allIndications.filter((ind: any) => {
+        const created = new Date(ind.created_at || ind.timestamp || ind.created)
+        return created > oneHourAgo
+      }).length
 
-      const strategies = await query<{ count: number }>(
-        "SELECT COUNT(*) as count FROM strategies WHERE connection_id = ? AND created_at > datetime('now', '-1 hour')",
-        [conn.id]
-      ).catch(() => [{ count: 0 }])
+      // Get strategies from Redis settings keys
+      const strategiesCount = await countRecentStrategies(conn.id, oneHourAgo)
 
       const status = {
         connectionId: conn.id,
@@ -74,34 +71,34 @@ export async function GET() {
             endDate: engineState?.prehistoric_data_end,
             progressionCycles: progressionState?.prehistoric_cycles || 0,
           },
-          indications: {
-            processing: engineStatus !== null,
-            cycleCount: engineState?.indication_cycle_count || cycleData?.cycleCount || 0,
-            avgDurationMs: engineState?.indication_avg_duration_ms || 0,
-            successRate: progressionState?.cycle_success_rate || "0%",
-            lastRun: engineState?.last_indication_run,
-            recentRecords: indications[0]?.count || 0,
-          },
-          strategies: {
-            processing: engineStatus !== null,
-            cycleCount: engineState?.strategy_cycle_count || strategyStats?.cycleCount || 0,
-            avgDurationMs: engineState?.strategy_avg_duration_ms || 0,
-            totalEvaluated: engineState?.total_strategies_evaluated || 0,
-            lastRun: engineState?.last_strategy_run,
-            recentRecords: strategies[0]?.count || 0,
-          },
+           indications: {
+             processing: engineStatus !== null,
+             cycleCount: engineState?.indication_cycle_count || cycleData?.cycleCount || 0,
+             avgDurationMs: engineState?.indication_avg_duration_ms || 0,
+             successRate: progressionState?.cycle_success_rate || "0%",
+             lastRun: engineState?.last_indication_run,
+             recentRecords: recentIndicationsCount,
+           },
+           strategies: {
+             processing: engineStatus !== null,
+             cycleCount: engineState?.strategy_cycle_count || strategyStats?.cycleCount || 0,
+             avgDurationMs: engineState?.strategy_avg_duration_ms || 0,
+             totalEvaluated: engineState?.total_strategies_evaluated || 0,
+             lastRun: engineState?.last_strategy_run,
+             recentRecords: strategiesCount,
+           },
           realtime: {
             processing: engineStatus !== null,
             cycleCount: engineState?.realtime_cycle_count || 0,
             avgDurationMs: engineState?.realtime_avg_duration_ms || 0,
             lastRun: engineState?.last_realtime_run,
           },
-          liveTrading: {
-            active: engineStatus !== null,
-            tradesTotal: trades[0]?.count || 0,
-            pseudoPositions: pseudoPositions[0]?.count || 0,
-            status: engineState?.status || "idle",
-          },
+           liveTrading: {
+             active: engineStatus !== null,
+             tradesTotal: tradesCount,
+             pseudoPositions: positionsCount,
+             status: engineState?.status || "idle",
+           },
         },
         metrics: {
           successRate: progressionState?.cycle_success_rate || "0%",
@@ -126,13 +123,13 @@ export async function GET() {
         systemStatus.verification.allPhasesPassing = false
       }
 
-      if ((indications[0]?.count || 0) < 10) {
-        systemStatus.verification.warnings.push(`${conn.name}: Low indication activity (${indications[0]?.count} recent)`)
-      }
+       if (recentIndicationsCount < 10) {
+         systemStatus.verification.warnings.push(`${conn.name}: Low indication activity (${recentIndicationsCount} recent)`)
+       }
 
-      if ((strategies[0]?.count || 0) < 5) {
-        systemStatus.verification.warnings.push(`${conn.name}: Low strategy activity (${strategies[0]?.count} recent)`)
-      }
+       if (strategiesCount < 5) {
+         systemStatus.verification.warnings.push(`${conn.name}: Low strategy activity (${strategiesCount} recent)`)
+       }
 
       systemStatus.components.push(status)
     }

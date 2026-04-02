@@ -1,5 +1,5 @@
 // Risk management system for trading bot
-import { query } from "./db"
+import { getRedisClient } from "./redis-db"
 
 export interface RiskLimits {
   max_position_size: number
@@ -25,7 +25,7 @@ export class RiskManager {
     this.limits = limits
   }
 
-  async checkPositionRisk(quantity: number, price: number, leverage = 1.0): Promise<RiskCheck> {
+   async checkPositionRisk(quantity: number, price: number, leverage = 1.0): Promise<RiskCheck> {
     // Check leverage limit
     if (leverage > this.limits.max_leverage) {
       return {
@@ -46,12 +46,18 @@ export class RiskManager {
     }
 
     // Check open positions count
-    const openPositions = await query(
-      "SELECT COUNT(*) as count FROM positions WHERE portfolio_id = $1 AND status = $2",
-      [this.portfolioId, "open"],
-    )
-
-    const currentOpenCount = openPositions[0]?.count || 0
+    const client = getRedisClient()
+    const positionKeys = await client.keys(`positions:*`)
+    let currentOpenCount = 0
+    
+    if (positionKeys.length > 0) {
+      const positionPromises = positionKeys.map(key => client.hgetall(key))
+      const positions: (Record<string, string> | null)[] = await Promise.all(positionPromises)
+      const validPositions = positions.filter((pos): pos is Record<string, string> => pos !== null)
+      currentOpenCount = validPositions.filter(pos => 
+        Number(pos.portfolio_id) === this.portfolioId && pos.status === 'open'
+      ).length
+    }
 
     if (currentOpenCount >= this.limits.max_open_positions) {
       return {
@@ -81,9 +87,9 @@ export class RiskManager {
     }
 
     // Get portfolio value for exposure calculation
-    const portfolio = await query("SELECT total_value FROM portfolios WHERE id = $1", [this.portfolioId])
-
-    const portfolioValue = portfolio[0]?.total_value || 0
+    const portfolioKey = `portfolios:${this.portfolioId}`
+    const portfolioData = await client.hgetall(portfolioKey) || {}
+    const portfolioValue = Number(portfolioData.total_value) || 0
     const currentExposure = await this.getTotalExposure()
 
     return {
@@ -94,61 +100,80 @@ export class RiskManager {
   }
 
   private async getDailyPnL(): Promise<number> {
-    const result = await query(
-      `SELECT COALESCE(SUM(realized_pnl), 0) as daily_pnl
-       FROM positions
-       WHERE portfolio_id = $1
-       AND closed_at >= CURRENT_DATE`,
-      [this.portfolioId],
-    )
+    const client = getRedisClient()
+    const positionKeys = await client.keys(`positions:*`)
+    let totalPnL = 0
+    
+    if (positionKeys.length > 0) {
+      const positionPromises = positionKeys.map(key => client.hgetall(key))
+      const positions: (Record<string, string> | null)[] = await Promise.all(positionPromises)
+      const validPositions = positions.filter((pos): pos is Record<string, string> => pos !== null)
+      const today = new Date().toISOString().split('T')[0]
+      
+      for (const pos of validPositions) {
+        if (Number(pos.portfolio_id) === this.portfolioId && pos.closed_at) {
+          const closedDate = pos.closed_at.split('T')[0]
+          if (closedDate === today) {
+            totalPnL += Number(pos.realized_pnl) || 0
+          }
+        }
+      }
+    }
 
-    return result[0]?.daily_pnl || 0
+    return totalPnL
   }
 
   private async getCurrentDrawdown(): Promise<number> {
-    const portfolio = await query("SELECT total_value, initial_value FROM portfolios WHERE id = $1", [this.portfolioId])
+    const client = getRedisClient()
+    const portfolioKey = `portfolios:${this.portfolioId}`
+    const portfolioData = await client.hgetall(portfolioKey) || {}
 
-    if (portfolio.length === 0) return 0
+    if (!portfolioData.total_value || !portfolioData.initial_value) return 0
 
-    const { total_value, initial_value } = portfolio[0]
+    const totalValue = Number(portfolioData.total_value)
+    const initialValue = Number(portfolioData.initial_value)
 
-    if (initial_value === 0) return 0
+    if (initialValue === 0) return 0
 
-    const drawdown = ((initial_value - total_value) / initial_value) * 100
+    const drawdown = ((initialValue - totalValue) / initialValue) * 100
 
     return Math.max(0, drawdown)
   }
 
   private async getTotalExposure(): Promise<number> {
-    const result = await query(
-      `SELECT COALESCE(SUM(quantity * current_price * leverage), 0) as exposure
-       FROM positions
-       WHERE portfolio_id = $1 AND status = $2`,
-      [this.portfolioId, "open"],
-    )
+    const client = getRedisClient()
+    const positionKeys = await client.keys(`positions:*`)
+    let totalExposure = 0
+    
+    if (positionKeys.length > 0) {
+      const positionPromises = positionKeys.map(key => client.hgetall(key))
+      const positions: (Record<string, string> | null)[] = await Promise.all(positionPromises)
+      const validPositions = positions.filter((pos): pos is Record<string, string> => pos !== null)
+      
+      for (const pos of validPositions) {
+        if (Number(pos.portfolio_id) === this.portfolioId && pos.status === 'open') {
+          const quantity = Number(pos.quantity) || 0
+          const currentPrice = Number(pos.current_price) || 0
+          const leverage = Number(pos.leverage) || 0
+          totalExposure += quantity * currentPrice * leverage
+        }
+      }
+    }
 
-    return result[0]?.exposure || 0
+    return totalExposure
   }
 
   async updateRiskLimits(newLimits: Partial<RiskLimits>): Promise<void> {
     this.limits = { ...this.limits, ...newLimits }
-
-    await query(
-      `UPDATE risk_limits
-       SET max_position_size = $1,
-           max_daily_loss = $2,
-           max_drawdown_percent = $3,
-           max_leverage = $4,
-           max_open_positions = $5
-       WHERE portfolio_id = $6`,
-      [
-        this.limits.max_position_size,
-        this.limits.max_daily_loss,
-        this.limits.max_drawdown_percent,
-        this.limits.max_leverage,
-        this.limits.max_open_positions,
-        this.portfolioId,
-      ],
-    )
+    
+    const client = getRedisClient()
+    const riskLimitsKey = `risk_limits:${this.portfolioId}`
+    await client.hset(riskLimitsKey, {
+      max_position_size: this.limits.max_position_size.toString(),
+      max_daily_loss: this.limits.max_daily_loss.toString(),
+      max_drawdown_percent: this.limits.max_drawdown_percent.toString(),
+      max_leverage: this.limits.max_leverage.toString(),
+      max_open_positions: this.limits.max_open_positions.toString(),
+    })
   }
 }

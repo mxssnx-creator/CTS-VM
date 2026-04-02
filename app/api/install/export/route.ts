@@ -1,35 +1,68 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import { getRedisClient, initRedis } from "@/lib/redis-db"
 
 export async function POST() {
   try {
-    const settings = await query(`
-      SELECT key, value, category, subcategory, description
-      FROM system_settings
-      ORDER BY category, subcategory, key
-    `)
+    await initRedis()
+    const client = getRedisClient()
 
-    const connections = await query(`
-      SELECT 
-        id, name, exchange, api_type, connection_method,
-        margin_mode, position_type, testnet, is_active,
-        settings, created_at, updated_at
-      FROM exchange_connections
-      ORDER BY exchange, name
-    `)
+    // Export settings from Redis keys
+    const settingsKeys = await client.keys("settings:*") || []
+    const settings = []
+    for (const key of settingsKeys) {
+      const value = await client.get(key)
+      if (value) {
+        const settingKey = key.replace("settings:", "")
+        try {
+          const parsedValue = JSON.parse(value)
+          settings.push({
+            key: settingKey,
+            value: parsedValue,
+            category: "general",
+            subcategory: "",
+            description: ""
+          })
+        } catch {
+          settings.push({
+            key: settingKey,
+            value: value,
+            category: "general",
+            subcategory: "",
+            description: ""
+          })
+        }
+      }
+    }
+
+    // Export connections from Redis
+    const connIds = await client.smembers("connections") || []
+    const connections = []
+    for (const id of connIds) {
+      const conn = await client.hgetall(`connection:${id}`)
+      if (conn) {
+        connections.push({
+          id: conn.id,
+          name: conn.name,
+          exchange: conn.exchange,
+          api_type: conn.api_type || "standard",
+          connection_method: conn.connection_method || "api",
+          margin_mode: conn.margin_mode || "isolated",
+          position_type: conn.position_type || "both",
+          testnet: conn.is_testnet === "1" || conn.is_testnet === true,
+          is_active: conn.is_enabled === "1" || conn.is_enabled === true,
+          settings: conn.settings ? JSON.parse(conn.settings as string) : {},
+          created_at: conn.created_at,
+          updated_at: conn.updated_at
+        })
+      }
+    }
 
     const exportData = {
       version: "1.0.0",
       exported_at: new Date().toISOString(),
       project: "cts-v3",
-      settings: settings.map((s: any) => ({
-        key: s.key,
-        value: s.value,
-        category: s.category,
-        subcategory: s.subcategory,
-        description: s.description,
-      })),
-      connections: connections.map((c: any) => ({
+      settings: settings,
+      connections: connections.map((c) => ({
         name: c.name,
         exchange: c.exchange,
         api_type: c.api_type,

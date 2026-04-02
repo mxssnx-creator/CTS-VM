@@ -3,7 +3,6 @@
  * Handles real-time market data streaming and processing
  */
 
-import { sql } from "@/lib/db"
 import { WebSocketManager } from "./websocket-manager"
 
 export interface MarketDataUpdate {
