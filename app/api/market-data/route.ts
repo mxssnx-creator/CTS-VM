@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { initRedis, getSettings, setSettings } from "@/lib/redis-db"
+import { initRedis, getSettings, setSettings, getMarketData, getAllConnections, saveMarketData } from "@/lib/redis-db"
+import { BingXMarketDataService } from "@/lib/bingx-market-data"
 
 export const runtime = "nodejs"
 
 /**
  * GET /api/market-data
- * Returns market data (mock for development, real-time in production)
+ * Returns market data - uses real Redis-cached data first, then real exchange API, then synthetic fallback
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,52 +17,63 @@ export async function GET(request: NextRequest) {
 
     await initRedis()
 
-    // Check cache
-    const cacheKey = `market:${exchange}:${symbol}:${interval}`
-    let marketData = await getSettings(cacheKey)
+    // Try to get real market data from Redis first (populated by engine or market data loader)
+    const realData = await getMarketData(symbol)
+    if (realData && realData.price) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          ...realData,
+          timestamp: Date.now(),
+          datetime: new Date().toISOString(),
+          last_update: new Date().toISOString(),
+        },
+        source: "redis",
+      })
+    }
 
-    if (!marketData) {
-      // Generate mock market data for development
-      const basePrice = getBasePrice(symbol)
-      const variation = basePrice * 0.02
-      
-      marketData = {
-        symbol,
-        exchange,
-        interval,
-        price: basePrice + (Math.random() - 0.5) * variation,
-        open: basePrice,
-        high: basePrice + variation,
-        low: basePrice - variation,
-        close: basePrice + (Math.random() - 0.5) * variation,
-        volume: Math.random() * 1000000,
-        volume_24h: Math.random() * 10000000,
-        high_24h: basePrice + variation,
-        low_24h: basePrice - variation,
-        change_24h: (Math.random() - 0.5) * 5,
-        change_24h_percentage: ((Math.random() - 0.5) * 5).toFixed(2) + "%",
-        timestamp: Date.now(),
-        datetime: new Date().toISOString(),
-        bid: basePrice - 0.5,
-        ask: basePrice + 0.5,
-        bid_volume: Math.random() * 100,
-        ask_volume: Math.random() * 100,
-        last_update: new Date().toISOString(),
-      }
+    // Try to fetch from exchange API if credentials exist
+    const exchangeData = await fetchFromExchange(symbol, exchange, interval)
+    if (exchangeData) {
+      return NextResponse.json({
+        success: true,
+        data: exchangeData,
+        source: "exchange",
+      })
+    }
 
-      // Cache for 5 seconds
-      await setSettings(cacheKey, JSON.stringify(marketData))
-    } else if (typeof marketData === "string") {
-      try {
-        marketData = JSON.parse(marketData)
-      } catch {
-        // If parsing fails, use the value as-is
-      }
+    // Synthetic fallback
+    const basePrice = getBasePrice(symbol)
+    const variation = basePrice * 0.02
+    
+    const marketData = {
+      symbol,
+      exchange,
+      interval,
+      price: basePrice + (Math.random() - 0.5) * variation,
+      open: basePrice,
+      high: basePrice + variation,
+      low: basePrice - variation,
+      close: basePrice + (Math.random() - 0.5) * variation,
+      volume: Math.random() * 1000000,
+      volume_24h: Math.random() * 10000000,
+      high_24h: basePrice + variation,
+      low_24h: basePrice - variation,
+      change_24h: (Math.random() - 0.5) * 5,
+      change_24h_percentage: ((Math.random() - 0.5) * 5).toFixed(2) + "%",
+      timestamp: Date.now(),
+      datetime: new Date().toISOString(),
+      bid: basePrice - 0.5,
+      ask: basePrice + 0.5,
+      bid_volume: Math.random() * 100,
+      ask_volume: Math.random() * 100,
+      last_update: new Date().toISOString(),
     }
 
     return NextResponse.json({
       success: true,
       data: marketData,
+      source: "synthetic",
     })
   } catch (error) {
     console.error("[v0] Market data error:", error)
@@ -74,6 +86,46 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     )
   }
+}
+
+async function fetchFromExchange(symbol: string, exchange: string, interval: string): Promise<any | null> {
+  try {
+    const allConnections = await getAllConnections()
+    const conn = allConnections.find((c: any) => c.exchange === exchange && c.api_key && c.api_key.length >= 20)
+    if (!conn) return null
+
+    if (exchange === "bingx") {
+      const bingxSymbol = symbol.endsWith("USDT") ? symbol.replace("USDT", "-USDT") : symbol + "-USDT"
+      const service = new BingXMarketDataService({
+        exchange: "bingx",
+        apiType: conn.api_type || "perpetual_futures",
+        isTestnet: conn.is_testnet === "1" || conn.is_testnet === true,
+      })
+      const candles = await service.fetchKlines(bingxSymbol, interval, 1)
+      if (candles.length > 0) {
+        const candle = candles[0]
+        const data = {
+          symbol,
+          exchange,
+          interval,
+          price: candle.close,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: candle.volume,
+          timestamp: candle.timestamp,
+          datetime: new Date(candle.timestamp).toISOString(),
+          last_update: new Date().toISOString(),
+        }
+        await saveMarketData(symbol, data)
+        return data
+      }
+    }
+  } catch (error) {
+    console.warn(`[v0] Exchange API fetch failed for ${exchange}/${symbol}:`, error instanceof Error ? error.message : String(error))
+  }
+  return null
 }
 
 /**

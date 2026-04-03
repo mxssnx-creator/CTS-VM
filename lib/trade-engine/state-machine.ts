@@ -11,7 +11,8 @@
 import { createExchangeConnector } from "@/lib/exchange-connectors"
 import { positionTracker, LivePosition, OrderRecord } from "@/lib/positions/position-tracker"
 import { indicatorCalculator, PriceData } from "@/lib/indicators/calculator"
-import { redisDb } from "@/lib/redis-db"
+import { redisDb, getMarketData, getAllConnections } from "@/lib/redis-db"
+import { BingXMarketDataService } from "@/lib/bingx-market-data"
 
 export interface TradeEngineConfig {
   connectionId: string
@@ -166,10 +167,37 @@ export class TradeEngineStateMachine {
     if (!this.config) return
 
     try {
-      // Get price data (simplified - would normally fetch from market data stream)
+      // Get real price data from Redis market data cache
+      const marketData = await getMarketData(symbol)
+      let prices: number[]
+
+      if (marketData && marketData.price) {
+        prices = [marketData.price]
+      } else {
+        // Try to fetch from exchange if credentials exist
+        const allConnections = await getAllConnections()
+        const conn = allConnections.find((c: any) => c.api_key && c.api_key.length >= 20)
+        if (conn && conn.exchange === "bingx") {
+          try {
+            const bingxSymbol = symbol.endsWith("USDT") ? symbol.replace("USDT", "-USDT") : symbol + "-USDT"
+            const service = new BingXMarketDataService({
+              exchange: "bingx",
+              apiType: conn.api_type || "perpetual_futures",
+              isTestnet: conn.is_testnet === "1" || conn.is_testnet === true,
+            })
+            const candles = await service.fetchKlines(bingxSymbol, "1m", 5)
+            prices = candles.map((c: any) => c.close)
+          } catch {
+            prices = [100, 101, 102, 101, 103]
+          }
+        } else {
+          prices = [100, 101, 102, 101, 103]
+        }
+      }
+
       const mockPriceData: PriceData = {
         symbol,
-        prices: [100, 101, 102, 101, 103], // Mock data
+        prices,
       }
 
       // Evaluate signals
