@@ -3,7 +3,7 @@
  * Manages asynchronous processing for symbols, indications, pseudo positions, and strategies
  */
 
-import { getSettings, setSettings, getAllConnections } from "@/lib/redis-db"
+import { getSettings, setSettings, getAllConnections, getConnection, saveMarketData } from "@/lib/redis-db"
 import { DataSyncManager } from "@/lib/data-sync-manager"
 import { IndicationProcessor } from "./indication-processor"
 import { StrategyProcessor } from "./strategy-processor"
@@ -12,6 +12,8 @@ import { RealtimeProcessor } from "./realtime-processor"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { loadMarketDataForEngine, loadPrehistoricMarketData } from "@/lib/market-data-loader"
 import { ProgressionStateManager } from "@/lib/progression-state-manager"
+import { createExchangeConnector } from "@/lib/exchange-connectors"
+import { BingXMarketDataService } from "@/lib/bingx-market-data"
 
 export interface EngineConfig {
   connectionId: string
@@ -274,9 +276,79 @@ export class TradeEngineManager {
    */
   private async loadMarketDataRange(symbol: string, start: Date, end: Date): Promise<void> {
     try {
-      // For now, skip actual exchange API calls during development
-      // In production, this would fetch OHLCV data from the exchange
       console.log(`[v0] [EngineManager] Loading market data for ${symbol}: ${start.toISOString()} to ${end.toISOString()}`)
+      
+      // Fetch real market data from exchange when credentials are available
+      const connection = await getConnection(this.connectionId)
+      if (connection && connection.api_key && connection.api_secret) {
+        try {
+          if (connection.exchange === "bingx") {
+            const bingxSymbol = symbol.endsWith("USDT") ? symbol.replace("USDT", "-USDT") : symbol + "-USDT"
+            const marketDataService = new BingXMarketDataService({
+              exchange: "bingx",
+              apiType: connection.api_type || "perpetual_futures",
+              isTestnet: connection.is_testnet === "1" || connection.is_testnet === true,
+            })
+            
+            const candles = await marketDataService.fetchKlines(bingxSymbol, "1m", 500)
+            
+            for (const candle of candles) {
+              await saveMarketData(symbol, {
+                symbol,
+                exchange: connection.exchange,
+                interval: "1m",
+                price: candle.close,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+                volume: candle.volume,
+                timestamp: new Date(candle.timestamp).toISOString(),
+              })
+            }
+            
+            console.log(`[v0] [EngineManager] ✓ Fetched ${candles.length} real BingX candles for ${symbol}`)
+          } else {
+            try {
+              const connector = await createExchangeConnector(connection.exchange, {
+                apiKey: connection.api_key,
+                apiSecret: connection.api_secret,
+                apiType: connection.api_type || "perpetual_futures",
+                isTestnet: connection.is_testnet === "1" || connection.is_testnet === true,
+              })
+              
+              if ("getKlines" in connector && typeof (connector as any).getKlines === "function") {
+                const klines = await (connector as any).getKlines(symbol, "1m", {
+                  startTime: start.getTime(),
+                  endTime: end.getTime(),
+                  limit: 500,
+                })
+                
+                for (const kline of klines) {
+                  await saveMarketData(symbol, {
+                    symbol,
+                    exchange: connection.exchange,
+                    interval: "1m",
+                    price: kline.close,
+                    open: kline.open,
+                    high: kline.high,
+                    low: kline.low,
+                    close: kline.close,
+                    volume: kline.volume,
+                    timestamp: new Date(kline.timestamp).toISOString(),
+                  })
+                }
+                
+                console.log(`[v0] [EngineManager] ✓ Fetched ${klines.length} real klines for ${symbol}`)
+              }
+            } catch (connectorError) {
+              console.warn(`[v0] [EngineManager] Exchange connector failed: ${connectorError instanceof Error ? connectorError.message : String(connectorError)}`)
+            }
+          }
+        } catch (exchangeError) {
+          console.warn(`[v0] [EngineManager] Exchange API failed, using seeded data: ${exchangeError instanceof Error ? exchangeError.message : String(exchangeError)}`)
+        }
+      }
       
       // Mark this range as synced in Redis
       await DataSyncManager.markSynced(
