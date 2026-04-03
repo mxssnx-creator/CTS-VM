@@ -10,7 +10,7 @@ import { StrategyProcessor } from "./strategy-processor"
 import { PseudoPositionManager } from "./pseudo-position-manager"
 import { RealtimeProcessor } from "./realtime-processor"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
-import { loadMarketDataForEngine } from "@/lib/market-data-loader"
+import { loadMarketDataForEngine, loadPrehistoricMarketData } from "@/lib/market-data-loader"
 import { ProgressionStateManager } from "@/lib/progression-state-manager"
 
 export interface EngineConfig {
@@ -197,13 +197,13 @@ export class TradeEngineManager {
 
   /**
    * Load prehistoric data (historical data before real-time processing)
-   * Runs in background - does not block engine startup
+   * Uses BingX API with real credentials from Redis connection settings
+   * Respects timeframe from settings (marketTimeframe) and prehistoricDataDays
    */
   private async loadPrehistoricData(): Promise<void> {
     console.log("[v0] [Prehistoric] Starting background prehistoric data loading...")
 
     try {
-      // Check if prehistoric data already loaded
       const engineState = await getSettings(`trade_engine_state:${this.connectionId}`)
       if (engineState?.prehistoric_data_loaded) {
         console.log("[v0] [Prehistoric] Data already loaded, skipping...")
@@ -213,23 +213,59 @@ export class TradeEngineManager {
       const symbols = await this.getSymbols()
       console.log(`[v0] [Prehistoric] Loading data for ${symbols.length} symbol(s)`)
 
-      // Fast path: just mark as loaded - actual historical calculations happen as needed
-      const prehistoricEnd = new Date()
-      const prehistoricStart = new Date(prehistoricEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
+      await logProgressionEvent(this.connectionId, "prehistoric_start", "info", "Prehistoric data loading started", {
+        symbolsCount: symbols.length,
+      })
 
-      // Update state to mark prehistoric phase started
+      const allSettings = (await getSettings("all_settings")) || {}
+      const days = allSettings.prehistoricDataDays || 5
+      const marketTimeframe = allSettings.marketTimeframe || 1
+
+      const timeframeMap: Record<number, string> = {
+        1: "1m",
+        2: "1m",
+        3: "1m",
+        5: "5m",
+        10: "5m",
+        15: "15m",
+      }
+      const interval = timeframeMap[marketTimeframe] || "1m"
+
+      console.log(`[v0] [Prehistoric] Settings: days=${days}, marketTimeframe=${marketTimeframe}, interval=${interval}`)
+
+      await this.updateProgressionPhase("prehistoric_data", 15, `Loading ${days} days of ${interval} data from BingX...`)
+
+      const { loadPrehistoricMarketData } = await import("@/lib/market-data-loader")
+      const result = await loadPrehistoricMarketData(symbols, this.connectionId)
+
+      const prehistoricEnd = new Date()
+      const prehistoricStart = new Date(prehistoricEnd.getTime() - days * 24 * 60 * 60 * 1000)
+
       await setSettings(`trade_engine_state:${this.connectionId}`, {
         prehistoric_data_loaded: true,
         prehistoric_data_start: prehistoricStart.toISOString(),
         prehistoric_data_end: prehistoricEnd.toISOString(),
         prehistoric_symbols: symbols,
+        prehistoric_interval: interval,
+        prehistoric_days: days,
+        prehistoric_symbols_loaded: result.loaded,
+        prehistoric_symbols_total: result.total,
         updated_at: new Date().toISOString(),
       })
 
-      console.log("[v0] [Prehistoric] Background loading initiated - engine can now process real-time data")
+      console.log(`[v0] [Prehistoric] Complete: ${result.loaded}/${result.total} symbols loaded (${days} days, ${interval})`)
+
+      await logProgressionEvent(this.connectionId, "prehistoric_complete", "info", "Prehistoric data loading complete", {
+        symbolsLoaded: result.loaded,
+        symbolsTotal: result.total,
+        days,
+        interval,
+      })
     } catch (error) {
-      // Non-blocking - just log, don't throw
       console.warn("[v0] [Prehistoric] Background loading failed (non-fatal):", error instanceof Error ? error.message : String(error))
+      await logProgressionEvent(this.connectionId, "prehistoric_error", "error", "Prehistoric data loading failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 

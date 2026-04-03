@@ -245,8 +245,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}${endpoint}?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -287,8 +287,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}${endpoint}?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -327,8 +327,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}${endpoint}?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -363,8 +363,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}${endpoint}?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -400,8 +400,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}${endpoint}?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -439,8 +439,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/swap/v3/user/positions?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/swap/v3/user/positions?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -487,8 +487,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/swap/v3/trade/positionSide/set?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/positionSide/set?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -546,8 +546,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/wallet/v1/query_address?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/wallet/v1/query_address?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -582,8 +582,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/wallet/v1/withdraw?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/wallet/v1/withdraw?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -617,8 +617,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/wallet/v1/query_withdraw_list?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/wallet/v1/query_withdraw_list?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         headers: { "X-BX-APIKEY": this.credentials.apiKey },
@@ -649,8 +649,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/swap/v3/trade/leverage?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/leverage?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -683,8 +683,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/swap/v3/trade/marginType?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/marginType?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -716,8 +716,8 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params).toString()}&signature=${signature}`
-      const url = `${this.baseUrl}/openApi/swap/v3/trade/positionSide/set?${queryString}`
+      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/positionSide/set?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
         method: "POST",
@@ -737,5 +737,192 @@ export class BingXConnector extends BaseExchangeConnector {
       this.logError(`✗ Failed to set position mode: ${errorMsg}`)
       return { success: false, error: errorMsg }
     }
+  }
+
+  // ==================== MARKET DATA METHODS ====================
+
+  async getKlines(
+    symbol: string,
+    interval: string = "1m",
+    limit: number = 500,
+    startTime?: number,
+    endTime?: number
+  ): Promise<any[]> {
+    try {
+      const apiType = this.credentials.apiType || "perpetual_futures"
+      let url: string
+
+      if (apiType === "spot") {
+        const params = new URLSearchParams({ symbol, interval, limit: String(limit) })
+        if (startTime) params.append("startTime", String(startTime))
+        if (endTime) params.append("endTime", String(endTime))
+        url = `${this.getBaseUrl()}/openApi/spot/v2/market/kline?${params.toString()}`
+      } else {
+        const params = new URLSearchParams({ symbol, interval, limit: String(limit) })
+        if (startTime) params.append("startTime", String(startTime))
+        if (endTime) params.append("endTime", String(endTime))
+        url = `${this.getBaseUrl()}/openApi/swap/v2/quote/klines?${params.toString()}`
+      }
+
+      const response = await this.rateLimitedFetch(url, {
+        method: "GET",
+        headers: { "X-BX-APIKEY": this.credentials.apiKey },
+      })
+
+      const data = await response.json()
+
+      if (data.code !== 0) {
+        this.logError(`Klines API error: ${data.msg || "Unknown error"}`)
+        return []
+      }
+
+      const klines = data.data || []
+      return klines.map((k: any) => ({
+        timestamp: Number(k[0]),
+        open: Number.parseFloat(k[1]),
+        high: Number.parseFloat(k[2]),
+        low: Number.parseFloat(k[3]),
+        close: Number.parseFloat(k[4]),
+        volume: Number.parseFloat(k[5]),
+      }))
+    } catch (error) {
+      this.logError(`Failed to fetch klines: ${error instanceof Error ? error.message : String(error)}`)
+      return []
+    }
+  }
+
+  async getTicker24hr(symbol?: string): Promise<any> {
+    try {
+      const apiType = this.credentials.apiType || "perpetual_futures"
+      let url: string
+
+      if (apiType === "spot") {
+        url = symbol
+          ? `${this.getBaseUrl()}/openApi/spot/v1/ticker/24hr?symbol=${symbol}`
+          : `${this.getBaseUrl()}/openApi/spot/v1/ticker/24hr`
+      } else {
+        url = symbol
+          ? `${this.getBaseUrl()}/openApi/swap/v2/quote/ticker?symbol=${symbol}`
+          : `${this.getBaseUrl()}/openApi/swap/v2/quote/ticker`
+      }
+
+      const response = await this.rateLimitedFetch(url, {
+        method: "GET",
+        headers: { "X-BX-APIKEY": this.credentials.apiKey },
+      })
+
+      const data = await response.json()
+
+      if (data.code !== 0) {
+        this.logError(`Ticker API error: ${data.msg || "Unknown error"}`)
+        return null
+      }
+
+      return data.data || null
+    } catch (error) {
+      this.logError(`Failed to fetch ticker: ${error instanceof Error ? error.message : String(error)}`)
+      return null
+    }
+  }
+
+  async getTickerPrice(symbol: string): Promise<number> {
+    try {
+      const apiType = this.credentials.apiType || "perpetual_futures"
+      let url: string
+
+      if (apiType === "spot") {
+        url = `${this.getBaseUrl()}/openApi/spot/v1/ticker/price?symbol=${symbol}`
+      } else {
+        url = `${this.getBaseUrl()}/openApi/swap/v2/quote/price?symbol=${symbol}`
+      }
+
+      const response = await this.rateLimitedFetch(url, {
+        method: "GET",
+        headers: { "X-BX-APIKEY": this.credentials.apiKey },
+      })
+
+      const data = await response.json()
+
+      if (data.code !== 0) {
+        return 0
+      }
+
+      const priceData = data.data
+      return Number.parseFloat(priceData?.price || priceData?.[0]?.price || "0")
+    } catch (error) {
+      return 0
+    }
+  }
+
+  async getDepth(symbol: string, limit: number = 20): Promise<{ bids: [number, number][]; asks: [number, number][] }> {
+    try {
+      const apiType = this.credentials.apiType || "perpetual_futures"
+      let url: string
+
+      if (apiType === "spot") {
+        url = `${this.getBaseUrl()}/openApi/spot/v1/market/depth?symbol=${symbol}&limit=${limit}`
+      } else {
+        url = `${this.getBaseUrl()}/openApi/swap/v2/quote/depth?symbol=${symbol}&limit=${limit}`
+      }
+
+      const response = await this.rateLimitedFetch(url, {
+        method: "GET",
+        headers: { "X-BX-APIKEY": this.credentials.apiKey },
+      })
+
+      const data = await response.json()
+
+      if (data.code !== 0) {
+        this.logError(`Depth API error: ${data.msg || "Unknown error"}`)
+        return { bids: [], asks: [] }
+      }
+
+      const depthData = data.data || {}
+      return {
+        bids: (depthData.bids || []).map((b: any) => [Number.parseFloat(b[0]), Number.parseFloat(b[1])]),
+        asks: (depthData.asks || []).map((a: any) => [Number.parseFloat(a[0]), Number.parseFloat(a[1])]),
+      }
+    } catch (error) {
+      this.logError(`Failed to fetch depth: ${error instanceof Error ? error.message : String(error)}`)
+      return { bids: [], asks: [] }
+    }
+  }
+
+  async getHistoricalKlines(
+    symbol: string,
+    interval: string = "1m",
+    startTime: number,
+    endTime: number,
+    limit: number = 500
+  ): Promise<any[]> {
+    try {
+      const allKlines: any[] = []
+      let currentStart = startTime
+
+      while (currentStart < endTime) {
+        const klines = await this.getKlines(symbol, interval, limit, currentStart, endTime)
+        if (klines.length === 0) break
+
+        allKlines.push(...klines)
+
+        const lastTimestamp = klines[klines.length - 1].timestamp
+        if (lastTimestamp <= currentStart) break
+        currentStart = lastTimestamp + 1
+      }
+
+      return allKlines
+    } catch (error) {
+      this.logError(`Failed to fetch historical klines: ${error instanceof Error ? error.message : String(error)}`)
+      return []
+    }
+  }
+
+  private getSignature(params: Record<string, any>): string {
+    const sortedKeys = Object.keys(params).sort()
+    const queryString = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
+    return crypto
+      .createHmac("sha256", this.credentials.apiSecret)
+      .update(queryString)
+      .digest("hex")
   }
 }

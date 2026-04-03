@@ -1,5 +1,7 @@
 // Market data fetcher for real-time price updates
-import { getRedisClient, saveMarketData } from "./redis-db"
+// Updated to use BingX API for real market data
+import { getRedisClient, saveMarketData, initRedis, getSettings, getAllConnections } from "./redis-db"
+import { BingXMarketDataService, getTimeframeFromSettings } from "./bingx-market-data"
 
 export interface MarketDataPoint {
   trading_pair_id: number
@@ -16,9 +18,10 @@ export class MarketDataFetcher {
   private isRunning = false
   private fetchInterval?: NodeJS.Timeout
   private updateInterval: number
+  private bingxService: BingXMarketDataService | null = null
+  private useBingX = true
 
   constructor(updateInterval = 60000) {
-    // Default 1 minute
     this.updateInterval = updateInterval
   }
 
@@ -26,12 +29,11 @@ export class MarketDataFetcher {
     if (this.isRunning) return
 
     console.log("[v0] Starting market data fetcher...")
+    await this.initializeBingXService()
     this.isRunning = true
 
-    // Fetch immediately
     await this.fetchMarketData()
 
-    // Then fetch at intervals
     this.fetchInterval = setInterval(() => {
       this.fetchMarketData()
     }, this.updateInterval)
@@ -46,19 +48,49 @@ export class MarketDataFetcher {
     console.log("[v0] Market data fetcher stopped")
   }
 
+  private async initializeBingXService() {
+    try {
+      await initRedis()
+      const connections = await getAllConnections()
+      const bingxConn = connections.find((c: any) => c.exchange === "bingx" && c.api_key && c.api_key.length > 10)
+
+      if (bingxConn) {
+        this.bingxService = new BingXMarketDataService({
+          exchange: "bingx",
+          apiType: bingxConn.api_type || "perpetual_futures",
+          isTestnet: bingxConn.is_testnet === "1" || bingxConn.is_testnet === true,
+          apiKey: bingxConn.api_key,
+          apiSecret: bingxConn.api_secret,
+        })
+        this.useBingX = true
+        console.log("[v0] [MarketDataFetcher] BingX service initialized with real credentials")
+      } else {
+        this.useBingX = false
+        console.log("[v0] [MarketDataFetcher] No BingX credentials found, using public endpoints")
+        this.bingxService = new BingXMarketDataService({
+          exchange: "bingx",
+          apiType: "perpetual_futures",
+          isTestnet: false,
+        })
+      }
+    } catch (error) {
+      this.useBingX = false
+      console.warn("[v0] [MarketDataFetcher] BingX init failed, using synthetic fallback:", error instanceof Error ? error.message : String(error))
+    }
+  }
+
   private async fetchMarketData() {
     try {
+      await initRedis()
       const client = getRedisClient()
-      
-      // Get all trading pair IDs from the set
+
       const tradingPairIds = await client.smembers("trading_pairs") || []
       const tradingPairs = []
 
-      // Filter active pairs and get symbol from hash
       for (const id of tradingPairIds) {
         const hashKey = `trading_pair:${id}`
         const pairData = await client.hgetall(hashKey)
-        
+
         if (pairData && pairData.is_active === "1") {
           tradingPairs.push({
             id: parseInt(id, 10),
@@ -67,17 +99,54 @@ export class MarketDataFetcher {
         }
       }
 
-      for (const pair of tradingPairs) {
-        // Simulate fetching market data (in production, call exchange API)
-        const marketData = this.generateMarketData(pair.id, pair.symbol)
-
-        // Store in Redis as JSON
-        await saveMarketData(pair.symbol, marketData)
+      if (tradingPairs.length === 0) {
+        const symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+        for (const symbol of symbols) {
+          await this.fetchSymbolData(symbol)
+        }
+        console.log(`[v0] Fetched market data for ${symbols.length} default symbols`)
+      } else {
+        for (const pair of tradingPairs) {
+          await this.fetchSymbolData(pair.symbol)
+        }
+        console.log(`[v0] Fetched market data for ${tradingPairs.length} trading pairs`)
       }
-
-      console.log(`[v0] Fetched market data for ${tradingPairs.length} trading pairs`)
     } catch (error) {
       console.error("[v0] Error fetching market data:", error)
+    }
+  }
+
+  private async fetchSymbolData(symbol: string) {
+    try {
+      const timeframe = await getTimeframeFromSettings()
+      const bingxSymbol = symbol.endsWith("-USDT") ? symbol : symbol.replace("USDT", "-USDT")
+
+      if (this.useBingX && this.bingxService) {
+        const candles = await this.bingxService.fetchKlines(bingxSymbol, timeframe, 5)
+
+        if (candles.length > 0) {
+          const latest = candles[candles.length - 1]
+          const marketData: MarketDataPoint = {
+            trading_pair_id: 0,
+            symbol,
+            timestamp: new Date(latest.timestamp),
+            open: latest.open,
+            high: latest.high,
+            low: latest.low,
+            close: latest.close,
+            volume: latest.volume,
+          }
+          await saveMarketData(symbol, marketData)
+          return
+        }
+      }
+
+      const marketData = this.generateMarketData(0, symbol)
+      await saveMarketData(symbol, marketData)
+    } catch (error) {
+      console.warn(`[v0] Failed to fetch ${symbol}, using synthetic:`, error instanceof Error ? error.message : String(error))
+      const marketData = this.generateMarketData(0, symbol)
+      await saveMarketData(symbol, marketData)
     }
   }
 
@@ -104,7 +173,6 @@ export class MarketDataFetcher {
   }
 }
 
-// Global market data fetcher instance
 let marketDataFetcher: MarketDataFetcher | null = null
 
 export function getMarketDataFetcher(): MarketDataFetcher {
