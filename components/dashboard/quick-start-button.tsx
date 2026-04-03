@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Zap, Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react"
 import { toast } from "@/lib/simple-toast"
 import { DetailedLoggingDialog } from "./detailed-logging-dialog"
+import { ComprehensiveDevModeDialog } from "./comprehensive-dev-mode-dialog"
 
 interface QuickStartStep {
   id: string
@@ -274,6 +275,12 @@ export function QuickStartButton() {
           {/* Detailed Logs Button */}
           <DetailedLoggingDialog />
         </div>
+
+        {/* Dev Mode Test Button - New Line */}
+        <ComprehensiveDevModeDialog />
+
+        {/* Dev Mode Test Button - New Line */}
+        <ComprehensiveDevModeDialog />
 
         {/* Info Box */}
         <div className="bg-white rounded border border-blue-200 p-3 text-xs text-gray-600">
