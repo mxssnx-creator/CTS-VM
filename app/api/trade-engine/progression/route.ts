@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { loadConnections } from "@/lib/file-storage"
+import { initRedis, getAllConnections } from "@/lib/redis-db"
 import { SystemLogger } from "@/lib/system-logger"
 import { query } from "@/lib/db"
 
@@ -7,8 +7,14 @@ export async function GET() {
   try {
     console.log("[v0] Fetching real-time trade engine progression data")
     
-    const connections = loadConnections()
-    const activeConnections = connections.filter((c) => c.is_active && c.is_enabled)
+    await initRedis()
+    const connections = await getAllConnections()
+    const activeConnections = connections.filter((c: any) => {
+      const isActive = c.is_active === "1" || c.is_active === true
+      const isEnabled = c.is_enabled === "1" || c.is_enabled === true
+      const isMainEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
+      return isActive && (isEnabled || isMainEnabled)
+    })
     
     console.log(`[v0] Processing ${activeConnections.length} active enabled connections`)
     

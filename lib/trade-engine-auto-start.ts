@@ -51,13 +51,17 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
       return
     }
 
-    // Filter for connections that are ACTIVE-INSERTED (in Active panel) with valid credentials
+    // Filter for connections that are ACTIVE-INSERTED (in Active panel) AND ENABLED with valid credentials
     // is_active_assigned=1 means they're added to the Active panel by user
-    // This is the ONLY requirement to start engines (not is_enabled)
+    // is_main_enabled=1 OR is_enabled=1 means they're enabled for trading
+    // Both conditions are required to start engines
     const enabledConnections = connections.filter((c) => {
-      const isActiveInserted = c.is_active_assigned === true || c.is_active_assigned === "true" || c.is_active_assigned === "1"
+      const isActiveAssigned = c.is_active_assigned === true || c.is_active_assigned === "true" || c.is_active_assigned === "1"
+      const isMainEnabled = c.is_main_enabled === true || c.is_main_enabled === "true" || c.is_main_enabled === "1"
+      const isEnabled = c.is_enabled === true || c.is_enabled === "true" || c.is_enabled === "1"
+      const isAnyEnabled = isMainEnabled || isEnabled
       const hasValidKey = c.api_key && c.api_key.length >= 20 && !c.api_key.includes("PLACEHOLDER")
-      return isActiveInserted && hasValidKey
+      return isActiveAssigned && isAnyEnabled && hasValidKey
     })
 
     console.log(`[v0] [Auto-Start] Found ${enabledConnections.length} eligible connections (inserted + enabled + valid keys) out of ${connections.length} total`)

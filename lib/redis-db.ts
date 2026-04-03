@@ -782,19 +782,21 @@ export async function getAssignedAndEnabledConnections(): Promise<any[]> {
   const allConnections = await getAllConnections()
   // Return connections that are:
   // 1. Active-assigned into Active panel (is_active_assigned="1")
-  // 2. AND active/enabled (is_active="1" OR is_enabled="1")
+  // 2. AND active/enabled (is_active="1" OR is_enabled="1" OR is_main_enabled="1")
   // This is the filter used by the trade engine coordinator to find active connections
   return allConnections.filter((c: any) => {
     // Check for active panel flags (modern approach)
     const isActiveAssigned = c.is_active_assigned === "1" || c.is_active_assigned === true
     const isActive = c.is_active === "1" || c.is_active === true
+    const isMainEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
+    const isEnabled = c.is_enabled === "1" || c.is_enabled === true
     
     // Fall back to old flags if needed
     const isAssigned = c.is_assigned === "1" || c.is_assigned === true
-    const isEnabled = c.is_enabled === "1" || c.is_enabled === true
+    const isSettingsEnabled = c.is_enabled === "1" || c.is_enabled === true
     
-    // Match either set of flags
-    return (isActiveAssigned && isActive) || (isAssigned && isEnabled)
+    // Match either set of flags - is_main_enabled is now also a valid enable flag
+    return (isActiveAssigned && (isActive || isMainEnabled || isEnabled)) || (isAssigned && isSettingsEnabled)
   })
 }
 

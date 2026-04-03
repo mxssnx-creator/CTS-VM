@@ -36,7 +36,7 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    const enabledConnections = connections.filter((c) => c.is_enabled)
+    const enabledConnections = connections.filter((c) => c.is_enabled || c.is_main_enabled)
 
     // Get health for each engine
     const engineHealthStatus = await Promise.all(

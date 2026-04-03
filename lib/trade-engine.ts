@@ -139,7 +139,7 @@ export class GlobalTradeEngineCoordinator {
       
       if (connections.length > 0) {
         connections.slice(0, 5).forEach((c: any) => {
-          console.log(`  - ${c.name || c.id}: exchange=${c.exchange}, assigned=${c.is_assigned}, enabled=${c.is_enabled}`)
+          console.log(`  - ${c.name || c.id}: exchange=${c.exchange}, assigned=${c.is_assigned}, main_enabled=${c.is_main_enabled}, enabled=${c.is_enabled}`)
         })
       }
       
@@ -381,19 +381,20 @@ export class GlobalTradeEngineCoordinator {
     this.isGloballyRunning = true
 
     try {
-      const { initRedis, getAllConnections } = await import("@/lib/redis-db")
+      const { initRedis, getAssignedAndEnabledConnections, getAllConnections } = await import("@/lib/redis-db")
       const { loadSettingsAsync } = await import("@/lib/settings-storage")
 
       await initRedis()
-      const connections = await getAllConnections()
+      const allConnections = await getAllConnections()
+      const enabledConnections = await getAssignedAndEnabledConnections()
       
-      if (!Array.isArray(connections)) {
-        console.error("[v0] [Coordinator] ERROR: connections is not an array during resume")
+      if (!Array.isArray(enabledConnections)) {
+        console.error("[v0] [Coordinator] ERROR: enabledConnections is not an array during resume")
         return
       }
 
-      // Get all connections with valid credentials
-      const validConnections = connections.filter((c) => {
+      // Get all enabled connections with valid credentials
+      const validConnections = enabledConnections.filter((c) => {
         const hasCredentials = (c.api_key || c.apiKey) && (c.api_secret || c.apiSecret)
         return hasCredentials
       })

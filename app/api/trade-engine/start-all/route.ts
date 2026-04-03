@@ -28,13 +28,13 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    // Filter for ONLY connections that are BOTH inserted AND enabled
-    // These are the ones displayed in "Active Connections"
+    // Filter for connections that are active-assigned AND enabled (is_enabled OR is_main_enabled) with live trade
     const activeConnections = connections.filter((c: any) => {
-      const isInserted = c.is_assigned === "1" || c.is_assigned === true
+      const isActiveAssigned = c.is_active_assigned === "1" || c.is_active_assigned === true
       const isEnabled = c.is_enabled === "1" || c.is_enabled === true
+      const isMainEnabled = c.is_main_enabled === "1" || c.is_main_enabled === true
       const hasLiveTrade = c.is_live_trade === "1" || c.is_live_trade === true
-      return isInserted && isEnabled && hasLiveTrade
+      return isActiveAssigned && (isEnabled || isMainEnabled) && hasLiveTrade
     })
 
     console.log(`[v0] [START-ALL] Total: ${connections.length}, Active: ${activeConnections.length}, With LiveTrade: ${activeConnections.length}`)
