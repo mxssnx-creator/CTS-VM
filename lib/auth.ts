@@ -3,7 +3,8 @@ import { SignJWT, jwtVerify } from "jose"
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+const JWT_SECRET_VALUE = process.env.JWT_SECRET || crypto.randomUUID()
+const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_VALUE)
 
 export interface User {
   id: number
