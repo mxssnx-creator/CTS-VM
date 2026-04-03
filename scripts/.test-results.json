@@ -1,0 +1,339 @@
+{
+  "total": 32,
+  "passed": 0,
+  "failed": 4,
+  "warnings": 28,
+  "details": [
+    {
+      "name": "Health endpoint",
+      "status": "fail",
+      "detail": "HTTP 404",
+      "phase": "server_health",
+      "timestamp": "2026-04-03T20:33:36.587Z"
+    },
+    {
+      "name": "System status",
+      "status": "fail",
+      "detail": "HTTP 404",
+      "phase": "server_health",
+      "timestamp": "2026-04-03T20:33:36.592Z"
+    },
+    {
+      "name": "Monitoring endpoint",
+      "status": "warn",
+      "detail": "May not be available in dev mode",
+      "phase": "server_health",
+      "timestamp": "2026-04-03T20:33:36.597Z"
+    },
+    {
+      "name": "Init Status",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "quickstart_init",
+      "timestamp": "2026-04-03T20:33:36.603Z"
+    },
+    {
+      "name": "Verify Startup",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "quickstart_init",
+      "timestamp": "2026-04-03T20:33:36.605Z"
+    },
+    {
+      "name": "Verify Complete",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "quickstart_init",
+      "timestamp": "2026-04-03T20:33:36.607Z"
+    },
+    {
+      "name": "Integration Test",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "quickstart_init",
+      "timestamp": "2026-04-03T20:33:36.608Z"
+    },
+    {
+      "name": "Database status",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "database_loads",
+      "timestamp": "2026-04-03T20:33:36.612Z"
+    },
+    {
+      "name": "Redis state",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "database_loads",
+      "timestamp": "2026-04-03T20:33:36.614Z"
+    },
+    {
+      "name": "Redis health",
+      "status": "fail",
+      "detail": "HTTP 404",
+      "phase": "database_loads",
+      "timestamp": "2026-04-03T20:33:36.616Z"
+    },
+    {
+      "name": "Connections status",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "connections",
+      "timestamp": "2026-04-03T20:33:36.621Z"
+    },
+    {
+      "name": "Active connections list",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "connections",
+      "timestamp": "2026-04-03T20:33:36.623Z"
+    },
+    {
+      "name": "Engine verification",
+      "status": "fail",
+      "detail": "HTTP 404",
+      "phase": "engine_verification",
+      "timestamp": "2026-04-03T20:33:36.632Z"
+    },
+    {
+      "name": "Realtime progress",
+      "status": "warn",
+      "detail": "No active connections",
+      "phase": "realtime_progress",
+      "timestamp": "2026-04-03T20:33:36.634Z"
+    },
+    {
+      "name": "API: Settings",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.637Z"
+    },
+    {
+      "name": "API: Positions",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.640Z"
+    },
+    {
+      "name": "API: Market Data",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.643Z"
+    },
+    {
+      "name": "API: Exchanges",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.645Z"
+    },
+    {
+      "name": "API: Risk Metrics",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.646Z"
+    },
+    {
+      "name": "API: System Verify APIs",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.649Z"
+    },
+    {
+      "name": "API: System Log",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.651Z"
+    },
+    {
+      "name": "API: Progression",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.652Z"
+    },
+    {
+      "name": "API: Preset Sets",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.653Z"
+    },
+    {
+      "name": "API: Quickstart Prehistoric Log",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.655Z"
+    },
+    {
+      "name": "API: Trading Stats",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.655Z"
+    },
+    {
+      "name": "API: Trading Engine Stats",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.656Z"
+    },
+    {
+      "name": "API: Positions Stats",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.658Z"
+    },
+    {
+      "name": "API: System Stats V2",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.660Z"
+    },
+    {
+      "name": "API: System Stats V3",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "api_functionality",
+      "timestamp": "2026-04-03T20:33:36.662Z"
+    },
+    {
+      "name": "Risk & engines config",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "settings_risk",
+      "timestamp": "2026-04-03T20:33:36.666Z"
+    },
+    {
+      "name": "System settings",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "settings_risk",
+      "timestamp": "2026-04-03T20:33:36.667Z"
+    },
+    {
+      "name": "Settings limits",
+      "status": "warn",
+      "detail": "HTTP 404",
+      "phase": "settings_risk",
+      "timestamp": "2026-04-03T20:33:36.668Z"
+    }
+  ],
+  "phaseResults": {
+    "server_health": {
+      "total": 3,
+      "passed": 0,
+      "failed": 2,
+      "warnings": 1
+    },
+    "quickstart_init": {
+      "total": 4,
+      "passed": 0,
+      "failed": 0,
+      "warnings": 4
+    },
+    "database_loads": {
+      "total": 3,
+      "passed": 0,
+      "failed": 1,
+      "warnings": 2
+    },
+    "connections": {
+      "total": 2,
+      "passed": 0,
+      "failed": 0,
+      "warnings": 2
+    },
+    "engine_verification": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "warnings": 0
+    },
+    "realtime_progress": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "warnings": 1
+    },
+    "api_functionality": {
+      "total": 15,
+      "passed": 0,
+      "failed": 0,
+      "warnings": 15
+    },
+    "settings_risk": {
+      "total": 3,
+      "passed": 0,
+      "failed": 0,
+      "warnings": 3
+    }
+  },
+  "phases": {
+    "server_health": {
+      "status": "complete",
+      "startTime": 1775248416534,
+      "endTime": 1775248416597,
+      "error": null
+    },
+    "quickstart_init": {
+      "status": "complete",
+      "startTime": 1775248416598,
+      "endTime": 1775248416608,
+      "error": null
+    },
+    "database_loads": {
+      "status": "complete",
+      "startTime": 1775248416609,
+      "endTime": 1775248416616,
+      "error": null
+    },
+    "connections": {
+      "status": "complete",
+      "startTime": 1775248416618,
+      "endTime": 1775248416623,
+      "error": null
+    },
+    "engine_verification": {
+      "status": "complete",
+      "startTime": 1775248416624,
+      "endTime": 1775248416632,
+      "error": null
+    },
+    "realtime_progress": {
+      "status": "complete",
+      "startTime": 1775248416633,
+      "endTime": 1775248416634,
+      "error": null
+    },
+    "api_functionality": {
+      "status": "complete",
+      "startTime": 1775248416635,
+      "endTime": 1775248416662,
+      "error": null
+    },
+    "settings_risk": {
+      "status": "complete",
+      "startTime": 1775248416664,
+      "endTime": 1775248416668,
+      "error": null
+    }
+  },
+  "startTime": 1775248416526,
+  "endTime": 1775248416669,
+  "duration": 143,
+  "crashCount": 0,
+  "prehistoricComplete": false,
+  "prehistoricCompleteTime": null,
+  "realtimeSnapshots": []
+}
