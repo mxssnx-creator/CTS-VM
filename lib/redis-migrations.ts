@@ -4,6 +4,8 @@
  */
 
 import { getRedisClient, initRedis, setMigrationsRun, haveMigrationsRun } from "./redis-db"
+import * as fs from "fs"
+import * as path from "path"
 
 interface Migration {
   name: string
@@ -642,16 +644,10 @@ const migrations: Migration[] = [
 ]
 
 /**
- * Run all pending migrations
+ * Rollback to previous migration
  */
 export async function runMigrations(): Promise<{ success: boolean; message: string; version: number }> {
   try {
-    if (await haveMigrationsRun()) {
-      const finalVer = Math.max(...migrations.map((m) => m.version))
-      console.log("[v0] [Migrations] ✓ Already executed in this process, skipping")
-      return { success: true, message: "Already run in this process", version: finalVer }
-    }
-
     await initRedis()
     const client = getRedisClient()
     const versionStr = await client.get("_schema_version")
@@ -667,42 +663,7 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       console.log(`[v0] [Migrations] Already at latest version ${finalVersion}`)
       
       // AUTO-FIX: Still ensure base connections are configured (handles env var addition after initial migration)
-      const baseConnections = ["bybit-x03", "bingx-x01", "pionex-x01", "orangex-x01"]
-      const envMappings: Record<string, { key: string; secret: string }> = {
-        "bingx-x01": { key: "BINGX_API_KEY", secret: "BINGX_API_SECRET" },
-        "bybit-x03": { key: "BYBIT_API_KEY", secret: "BYBIT_API_SECRET" },
-        "pionex-x01": { key: "PIONEX_API_KEY", secret: "PIONEX_API_SECRET" },
-        "orangex-x01": { key: "ORANGEX_API_KEY", secret: "ORANGEX_API_SECRET" },
-      }
-      
-      let credentialsInjected = 0
-      for (const connId of baseConnections) {
-        const mapping = envMappings[connId]
-        if (mapping) {
-          const apiKey = process.env[mapping.key] || ""
-          const apiSecret = process.env[mapping.secret] || ""
-          if (apiKey.length > 10 && apiSecret.length > 10) {
-            // Check if credentials already exist
-            const existing = await client.hget(`connection:${connId}`, "api_key")
-            if (!existing || existing.length < 10 || existing !== apiKey) {
-              await client.hset(`connection:${connId}`, {
-                api_key: apiKey,
-                api_secret: apiSecret,
-                is_active_assigned: "1",
-                is_enabled: "1",
-                is_main_enabled: "1",
-                connection_method: "library",
-                updated_at: new Date().toISOString(),
-              })
-              console.log(`[v0] [Migrations] Auto-injected ${connId} credentials from environment`)
-              credentialsInjected++
-            }
-          }
-        }
-      }
-      if (credentialsInjected > 0) {
-        console.log(`[v0] [Migrations] ✓ Injected credentials for ${credentialsInjected} connections`)
-      }
+      await injectBaseConnectionCredentials(client)
       
       setMigrationsRun()
       return { success: true, message: `Already at latest version ${finalVersion}`, version: finalVersion }
@@ -737,39 +698,7 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     console.log(`[v0] [Migrations] ✓ Verification: Schema version is now ${finalVersionCheck}`)
     
     // AUTO-FIX: Ensure base connections are properly configured with credentials from env
-    const baseConnections = ["bybit-x03", "bingx-x01", "pionex-x01", "orangex-x01"]
-    const envMappings: Record<string, { key: string; secret: string }> = {
-      "bingx-x01": { key: "BINGX_API_KEY", secret: "BINGX_API_SECRET" },
-      "bybit-x03": { key: "BYBIT_API_KEY", secret: "BYBIT_API_SECRET" },
-      "pionex-x01": { key: "PIONEX_API_KEY", secret: "PIONEX_API_SECRET" },
-      "orangex-x01": { key: "ORANGEX_API_KEY", secret: "ORANGEX_API_SECRET" },
-    }
-    
-    for (const connId of baseConnections) {
-      const updateData: Record<string, string> = {
-        is_active_assigned: "1",
-        is_enabled: "1",
-        is_main_enabled: "1",
-        is_active: "1",
-        connection_method: "library",
-        updated_at: new Date().toISOString(),
-      }
-      
-      // Check for env credentials
-      const mapping = envMappings[connId]
-      if (mapping) {
-        const apiKey = process.env[mapping.key] || ""
-        const apiSecret = process.env[mapping.secret] || ""
-        if (apiKey.length > 10 && apiSecret.length > 10) {
-          updateData.api_key = apiKey
-          updateData.api_secret = apiSecret
-          console.log(`[v0] [Migrations] Injecting ${connId} credentials from environment`)
-        }
-      }
-      
-      await client.hset(`connection:${connId}`, updateData)
-    }
-    console.log(`[v0] [Migrations] ✓ Auto-fixed ${baseConnections.length} base connections`)
+    await injectBaseConnectionCredentials(client)
     
     // Mark migrations as run in this process
     setMigrationsRun()
@@ -778,6 +707,118 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
   } catch (error) {
     console.error("[v0] [Migrations] ✗ Migration failed:", error)
     throw error
+  }
+}
+
+/**
+ * Inject credentials from environment variables into base connections.
+ * Always runs on startup to ensure credentials are fresh.
+ */
+async function injectBaseConnectionCredentials(client: any): Promise<void> {
+  const baseConnections = [
+    { id: "bybit-x03", name: "Bybit X03", exchange: "bybit", api_type: "unified" },
+    { id: "bingx-x01", name: "BingX X01", exchange: "bingx", api_type: "perpetual_futures" },
+    { id: "pionex-x01", name: "Pionex X01", exchange: "pionex", api_type: "perpetual_futures" },
+    { id: "orangex-x01", name: "OrangeX X01", exchange: "orangex", api_type: "perpetual_futures" },
+  ]
+  const envMappings: Record<string, { key: string; secret: string }> = {
+    "bingx-x01": { key: "BINGX_API_KEY", secret: "BINGX_API_SECRET" },
+    "bybit-x03": { key: "BYBIT_API_KEY", secret: "BYBIT_API_SECRET" },
+    "pionex-x01": { key: "PIONEX_API_KEY", secret: "PIONEX_API_SECRET" },
+    "orangex-x01": { key: "ORANGEX_API_KEY", secret: "ORANGEX_API_SECRET" },
+  }
+
+  let fallbackCredentials: Record<string, { api_key: string; api_secret: string }> = {}
+  try {
+    const projectRoot = path.resolve(process.cwd())
+    const connectionsFilePath = path.join(projectRoot, "data", "connections.json")
+    if (fs.existsSync(connectionsFilePath)) {
+      const connectionsData = JSON.parse(fs.readFileSync(connectionsFilePath, "utf-8"))
+      for (const conn of connectionsData) {
+        if (conn.api_key && conn.api_secret &&
+            !conn.api_key.includes("PLACEHOLDER") &&
+            conn.api_key.length > 10 &&
+            conn.api_secret.length > 10) {
+          let migrationId = conn.id
+          if (conn.exchange === "bingx" && !conn.id.includes("x01")) migrationId = "bingx-x01"
+          if (conn.exchange === "bybit" && !conn.id.includes("x03")) migrationId = "bybit-x03"
+          if (conn.exchange === "pionex" && !conn.id.includes("x01")) migrationId = "pionex-x01"
+          if (conn.exchange === "orangex" && !conn.id.includes("x01")) migrationId = "orangex-x01"
+          fallbackCredentials[migrationId] = {
+            api_key: conn.api_key,
+            api_secret: conn.api_secret,
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.log("[v0] [Migrations] Could not load fallback credentials from data/connections.json:", err)
+  }
+
+  let credentialsInjected = 0
+  for (const connDef of baseConnections) {
+    const connId = connDef.id
+    const mapping = envMappings[connId]
+    if (!mapping) continue
+
+    const existingData = await client.hgetall(`connection:${connId}`)
+    if (!existingData || Object.keys(existingData).length === 0) {
+      console.log(`[v0] [Migrations] Creating connection ${connId}`)
+      await client.hset(`connection:${connId}`, {
+        id: connId,
+        name: connDef.name,
+        exchange: connDef.exchange,
+        api_type: connDef.api_type,
+        api_key: "",
+        api_secret: "",
+        connection_method: "library",
+        connection_library: "native",
+        margin_type: "cross",
+        position_mode: "hedge",
+        is_testnet: "0",
+        is_enabled: "0",
+        is_main_enabled: "0",
+        is_active: "0",
+        is_predefined: "1",
+        is_assigned: "0",
+        is_active_assigned: "0",
+        is_live_trade: "0",
+        is_preset_trade: "0",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      await client.sadd("connections", connId)
+    }
+
+    let apiKey = process.env[mapping.key] || ""
+    let apiSecret = process.env[mapping.secret] || ""
+
+    if ((!apiKey || apiKey.length < 10 || !apiSecret || apiSecret.length < 10) && fallbackCredentials[connId]) {
+      apiKey = fallbackCredentials[connId].api_key
+      apiSecret = fallbackCredentials[connId].api_secret
+      console.log(`[v0] [Migrations] Using fallback credentials for ${connId}`)
+    }
+
+    if (apiKey.length > 10 && apiSecret.length > 10) {
+      const existingKey = await client.hget(`connection:${connId}`, "api_key")
+      if (!existingKey || existingKey.length < 10 || existingKey !== apiKey) {
+        await client.hset(`connection:${connId}`, {
+          api_key: apiKey,
+          api_secret: apiSecret,
+          is_active_assigned: "1",
+          is_enabled: "1",
+          is_main_enabled: "1",
+          is_active: "1",
+          connection_method: "library",
+          updated_at: new Date().toISOString(),
+        })
+        console.log(`[v0] [Migrations] Auto-injected ${connId} credentials`)
+        credentialsInjected++
+      }
+    }
+  }
+  if (credentialsInjected > 0) {
+    console.log(`[v0] [Migrations] Injected credentials for ${credentialsInjected} connections`)
   }
 }
 
