@@ -190,6 +190,9 @@ export class GlobalTradeEngineCoordinator {
       
       this.isGloballyRunning = true
       console.log(`[v0] [Coordinator] Global engine started: ${successCount}/${validConnections.length} connections active`)
+      
+      // Start global health monitoring to process refresh requests
+      this.startGlobalHealthMonitoring()
     } catch (error) {
       console.error("[v0] [Coordinator] Failed to start global engine:", error)
       // Don't throw - allow retry via refresh

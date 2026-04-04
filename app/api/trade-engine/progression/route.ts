@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { initRedis, getAllConnections } from "@/lib/redis-db"
+import { initRedis, getAllConnections, getRedisClient } from "@/lib/redis-db"
 import { SystemLogger } from "@/lib/system-logger"
 import { query } from "@/lib/db"
 
@@ -8,6 +8,7 @@ export async function GET() {
     console.log("[v0] Fetching real-time trade engine progression data")
     
     await initRedis()
+    const client = getRedisClient()
     const connections = await getAllConnections()
     const activeConnections = connections.filter((c: any) => {
       const isActive = c.is_active === "1" || c.is_active === true
@@ -32,6 +33,11 @@ export async function GET() {
           const engineStatus = await coordinator.getEngineStatus(conn.id)
           const isEngineRunning = engineStatus !== null
           
+          // ALSO check Redis engine state (primary in production)
+          const redisState = await client.hgetall(`trade_engine_state:${conn.id}`)
+          const redisRunning = redisState?.status === "running"
+          const redisProgression = await client.hgetall(`engine_progression:${conn.id}`)
+          
           // Get trade count from database
           const trades = await query<{ count: number }>(
             `SELECT COUNT(*) as count FROM trades WHERE connection_id = ?`,
@@ -53,9 +59,12 @@ export async function GET() {
           const tradeCount = trades[0]?.count || 0
           const pseudoCount = pseudoPositions[0]?.count || 0
           const dbState = state[0]
-          const engineState = isEngineRunning ? 'running' : (dbState?.state || 'idle')
-          const updatedAt = dbState?.updated_at
-          const prehistoricLoaded = dbState?.prehistoric_data_loaded || false
+          
+          // Determine engine state: coordinator > Redis > DB
+          const effectiveRunning = isEngineRunning || redisRunning
+          const engineState = effectiveRunning ? 'running' : (redisProgression?.phase || dbState?.state || 'idle')
+          const updatedAt = redisState?.updated_at || dbState?.updated_at
+          const prehistoricLoaded = redisState?.prehistoric_data_loaded === "true" || dbState?.prehistoric_data_loaded || false
           
           // Get cycle metrics from engine status if available
           const cycleMetrics = engineStatus ? {
@@ -63,9 +72,14 @@ export async function GET() {
             strategyCycles: engineStatus.strategy_cycle_count || 0,
             realtimeCycles: engineStatus.realtime_cycle_count || 0,
             lastCycleAt: engineStatus.last_cycle_at || null,
-          } : null
+          } : (redisState ? {
+            indicationCycles: Number(redisState.indication_cycle_count) || 0,
+            strategyCycles: Number(redisState.strategy_cycle_count) || 0,
+            realtimeCycles: Number(redisState.realtime_cycle_count) || 0,
+            lastCycleAt: redisState.last_indication_run || null,
+          } : null)
           
-          console.log(`[v0] ${conn.name}: ${engineState}, ${tradeCount} trades, ${pseudoCount} positions, running=${isEngineRunning}`)
+          console.log(`[v0] ${conn.name}: ${engineState}, ${tradeCount} trades, ${pseudoCount} positions, running=${effectiveRunning}`)
           
           return {
             connectionId: conn.id,
@@ -74,13 +88,18 @@ export async function GET() {
             isEnabled: conn.is_enabled,
             isActive: conn.is_active,
             isLiveTrading: conn.is_live_trade,
-            isEngineRunning,
+            isEngineRunning: effectiveRunning,
             engineState,
             tradeCount,
             pseudoPositionCount: pseudoCount,
             prehistoricDataLoaded: prehistoricLoaded,
             lastUpdate: updatedAt,
             cycleMetrics,
+            progressionPhase: redisProgression ? {
+              phase: redisProgression.phase,
+              progress: Number(redisProgression.progress) || 0,
+              detail: redisProgression.detail,
+            } : null,
             realTimeData: true, // Flag indicating this is real data
           }
         } catch (err) {
@@ -99,6 +118,7 @@ export async function GET() {
             prehistoricDataLoaded: false,
             lastUpdate: null,
             cycleMetrics: null,
+            progressionPhase: null,
             error: err instanceof Error ? err.message : String(err),
             realTimeData: false,
           }
@@ -116,7 +136,7 @@ export async function GET() {
     })
   } catch (error) {
     console.error("[v0] Failed to fetch progression:", error)
-    await SystemLogger.logError(error, "api", "GET /api/trade-engine/progression")
+    await SystemLogger.logError(error instanceof Error ? error.message : String(error), "api", "GET /api/trade-engine/progression")
     return NextResponse.json({ 
       success: false,
       error: "Failed to fetch progression",

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { initRedis, getConnection, updateConnection, setSettings, getSettings } from "@/lib/redis-db"
+import { initRedis, getConnection, updateConnection, setSettings, getSettings, getRedisClient } from "@/lib/redis-db"
 import { toggleConnectionLimiter } from "@/lib/connection-rate-limiter"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 
@@ -135,14 +135,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           })
           
           // Update global engine state to trigger coordinator
-          const globalState = await getSettings("trade_engine:global") || {}
-          await setSettings("trade_engine:global", {
-            ...globalState,
+          const client = getRedisClient()
+          const existingState = await client.hgetall("trade_engine:global") || {}
+          const activeCount = Number(existingState.active_connections || 0) + 1
+          await client.hset("trade_engine:global", {
             status: "running",
-            started_at: globalState.started_at || new Date().toISOString(),
+            started_at: existingState.started_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            active_connections: (globalState.active_connections || 0) + 1,
+            active_connections: String(activeCount),
             refresh_requested: new Date().toISOString(),
+            connectionId: resolvedId,
+            action: "start",
           })
           
           // Signal the coordinator to refresh engines
@@ -178,14 +181,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         })
         
         // Update global engine state
-        const globalState = await getSettings("trade_engine:global") || {}
-        const activeCount = Math.max(0, (globalState.active_connections || 1) - 1)
-        await setSettings("trade_engine:global", {
-          ...globalState,
+        const client = getRedisClient()
+        const existingState = await client.hgetall("trade_engine:global") || {}
+        const activeCount = Math.max(0, (Number(existingState.active_connections) || 1) - 1)
+        await client.hset("trade_engine:global", {
           updated_at: new Date().toISOString(),
-          active_connections: activeCount,
+          active_connections: String(activeCount),
           status: activeCount > 0 ? "running" : "idle",
           refresh_requested: new Date().toISOString(),
+          connectionId: resolvedId,
+          action: "stop",
         })
         
         // Signal the coordinator to refresh engines

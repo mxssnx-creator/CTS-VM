@@ -30,8 +30,22 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
     // Check if Global Trade Engine Coordinator is running
     await initRedis()
     const client = getRedisClient()
-    const globalState = await client.hgetall("trade_engine:global")
-    const globalRunning = globalState?.status === "running"
+    
+    // Read from BOTH Redis key patterns (hash from startup, string from toggle)
+    const globalStateHash = await client.hgetall("trade_engine:global")
+    const globalStateString = await client.get("settings:trade_engine:global")
+    
+    let globalRunning = false
+    if (globalStateHash?.status === "running") {
+      globalRunning = true
+    } else if (globalStateString) {
+      try {
+        const parsed = JSON.parse(globalStateString)
+        globalRunning = parsed?.status === "running"
+      } catch {
+        globalRunning = globalStateString === "running"
+      }
+    }
     
     if (!globalRunning) {
       console.log("[v0] [Auto-Start] Global Trade Engine is not running - skipping auto-start. Engines will resume when global is started.")
