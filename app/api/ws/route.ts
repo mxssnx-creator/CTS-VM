@@ -1,46 +1,34 @@
-// WebSocket API endpoint for real-time updates
 import type { NextRequest } from "next/server"
-import { apiErrorHandler, ApiError } from "@/lib/api-error-handler"
+import { initRedis, getSettings } from "@/lib/redis-db"
 
 export async function GET(request: NextRequest) {
   try {
-    // Validate WebSocket upgrade request
+    await initRedis()
+
     const upgrade = request.headers.get("upgrade")
     const connection = request.headers.get("connection")
 
-    if (upgrade?.toLowerCase() !== "websocket" || !connection?.toLowerCase().includes("upgrade")) {
-      throw new ApiError("WebSocket upgrade required", {
-        statusCode: 400,
-        code: "WEBSOCKET_UPGRADE_REQUIRED",
-        details: { upgrade, connection },
-        context: { operation: "websocket_connect" },
+    if (upgrade?.toLowerCase() === "websocket" && connection?.toLowerCase().includes("upgrade")) {
+      return new Response("WebSocket upgrade not supported in this environment. Use Server-Sent Events (SSE) or polling for real-time updates.", {
+        status: 426,
+        headers: { "Content-Type": "text/plain" },
       })
     }
 
-    // Check for authentication token
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader) {
-      throw new ApiError("WebSocket authentication required", {
-        statusCode: 401,
-        code: "WEBSOCKET_AUTH_REQUIRED",
-        context: { operation: "websocket_connect" },
-      })
-    }
-
-    // Note: Next.js doesn't natively support WebSocket in API routes
-    // This is a placeholder for WebSocket implementation
-    // In production, you would use a separate WebSocket server or a service like Pusher/Ably
-
-    const port = process.env.PORT || "3000"
-    const protocol = process.env.NODE_ENV === "production" ? "wss" : "ws"
-    const host = process.env.NEXT_PUBLIC_APP_URL || `localhost:${port}`
+    const engineStatus = await getSettings("engine_status") || { running: false }
+    const activeConnections = await getSettings("active_connections") || []
+    const progressionState = await getSettings("progression_state") || {}
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "WebSocket endpoint - use a WebSocket client to connect",
-        endpoint: `${protocol}://${host}/api/ws`,
-        timestamp: new Date().toISOString(),
+        message: "Real-time status endpoint",
+        data: {
+          engine: engineStatus,
+          activeConnections: Array.isArray(activeConnections) ? activeConnections.length : 0,
+          progression: progressionState,
+          timestamp: new Date().toISOString(),
+        },
       }),
       {
         status: 200,
@@ -48,10 +36,15 @@ export async function GET(request: NextRequest) {
       },
     )
   } catch (error) {
-    return await apiErrorHandler.handleError(error, {
-      endpoint: "/api/ws",
-      method: "GET",
-      operation: "websocket_connect",
-    })
+    return new Response(
+      JSON.stringify({
+        error: "Failed to fetch real-time status",
+        details: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    )
   }
 }

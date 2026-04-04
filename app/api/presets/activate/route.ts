@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { initRedis, getSettings, setSettings } from "@/lib/redis-db"
 
 export async function POST(request: Request) {
   try {
@@ -9,20 +10,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Preset ID is required" }, { status: 400 })
     }
 
-    console.log(`[v0] [API] [Presets] Activating preset: ${presetId}`)
+    await initRedis()
 
-    // TODO: Implement preset activation logic
-    // This should:
-    // 1. Load the preset configuration
-    // 2. Apply it to the active trade engine
-    // 3. Broadcast the change to all connected clients
-    // 4. Update the active preset state
+    const preset = await getSettings(`preset:${presetId}`)
+    if (!preset) {
+      return NextResponse.json({ error: `Preset ${presetId} not found` }, { status: 404 })
+    }
+
+    const activePreset = {
+      id: presetId,
+      name: preset.name || "Unknown Preset",
+      config: preset.config || {},
+      activatedAt: new Date().toISOString(),
+    }
+
+    await setSettings("active_preset", activePreset)
 
     return NextResponse.json({
       success: true,
       message: `Preset ${presetId} activated successfully`,
-      name: "Preset",
+      name: preset.name || "Preset",
       presetId,
+      config: preset.config || {},
     })
   } catch (error) {
     console.error("[v0] [API] [Presets] Error activating preset:", error)
