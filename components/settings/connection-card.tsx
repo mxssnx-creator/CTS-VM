@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Power, Trash2, Settings, ChevronDown, Loader2, AlertCircle, CheckCircle2, Edit2, Lock, Eye, EyeOff } from "lucide-react"
+import { Power, Trash2, Settings, ChevronDown, Loader2, AlertCircle, CheckCircle2, Edit2, Lock, Eye, EyeOff, FileText } from "lucide-react"
 import { useState, useEffect } from "react"
 import { toast } from "@/lib/simple-toast"
 import { isHTMLResponse, parseHTMLResponse, parseCloudflareError } from "@/lib/html-response-parser"
@@ -32,6 +32,7 @@ import {
   CONNECTION_METHODS,
   EXCHANGE_LIBRARY_PACKAGES,
 } from "@/lib/connection-predefinitions"
+import { ConnectionLogDialog } from "./connection-log-dialog"
 
 interface ConnectionCardProps {
   connection: ExchangeConnection
@@ -65,6 +66,7 @@ export function ConnectionCard({
   const [showTestLogInstant, setShowTestLogInstant] = useState(false)
   const [showSecrets, setShowSecrets] = useState(false)
   const [logsExpanded, setLogsExpanded] = useState(false)
+  const [logDialogOpen, setLogDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editDialogTab, setEditDialogTab] = useState("basic")
   const [engineError, setEngineError] = useState<string>("")
@@ -443,6 +445,16 @@ export function ConnectionCard({
             </Button>
 
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLogDialogOpen(true)}
+                className="flex items-center gap-1.5 text-xs h-8"
+                title="View detailed connection logs"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span className="font-medium">Log</span>
+              </Button>
               {(showTestLogInstant || testLogs.length > 0 || (connection.last_test_log && connection.last_test_log.length > 0)) && (
                 <Button
                   size="sm"
@@ -833,6 +845,13 @@ export function ConnectionCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConnectionLogDialog
+        open={logDialogOpen}
+        onOpenChange={setLogDialogOpen}
+        connectionId={connection.id}
+        connectionName={connection.name}
+      />
     </>
   )
 }
