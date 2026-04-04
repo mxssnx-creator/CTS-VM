@@ -22,8 +22,118 @@ import {
   ChevronRight,
   Activity,
   Terminal,
+  Cpu,
+  MemoryStick,
+  TrendingUp,
+  Database,
+  BarChart3,
+  Zap,
+  Shield,
+  Gauge,
+  Layers,
+  Target,
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+
+interface TestMetrics {
+  testDuration: string
+  cpuAverage: string
+  memoryAverage: string
+  cycleSuccessRate: string
+  avgCycleTime: string
+  totalCycles: number
+  totalIndicationsGenerated: number
+  strategiesEvaluated: number
+  prehistoricCandlesProcessed: number
+  symbolsLoaded: number
+  databaseSize: string
+  databaseKeys: number
+  tradeSuccessRate: string
+  positionsGenerated: number
+}
+
+interface TestOverview {
+  engineHealth: string
+  redisConnections: number
+  marketDataStatus: string
+  progressionPhase: string
+  activeStrategies: {
+    base: number
+    main: number
+    real: number
+    live: number
+  }
+  activePositions: number
+  indicationTypes: string[]
+  errorCount: number
+  warningsCount: number
+  throughputPerMinute: {
+    indications: number
+    strategies: number
+    cycles: number
+  }
+  resourceUtilization: {
+    cpuPeak: string
+    memoryPeak: string
+    networkLatency: string
+  }
+  dataIntegrity: {
+    candlesValidated: number
+    strategiesValidated: number
+    positionsValidated: number
+    consistencyScore: string
+  }
+}
+
+interface TestMetrics {
+  testDuration: string
+  cpuAverage: string
+  memoryAverage: string
+  cycleSuccessRate: string
+  avgCycleTime: string
+  totalCycles: number
+  totalIndicationsGenerated: number
+  strategiesEvaluated: number
+  prehistoricCandlesProcessed: number
+  symbolsLoaded: number
+  databaseSize: string
+  databaseKeys: number
+  tradeSuccessRate: string
+  positionsGenerated: number
+}
+
+interface TestOverview {
+  engineHealth: string
+  redisConnections: number
+  marketDataStatus: string
+  progressionPhase: string
+  activeStrategies: {
+    base: number
+    main: number
+    real: number
+    live: number
+  }
+  activePositions: number
+  indicationTypes: string[]
+  errorCount: number
+  warningsCount: number
+  throughputPerMinute: {
+    indications: number
+    strategies: number
+    cycles: number
+  }
+  resourceUtilization: {
+    cpuPeak: string
+    memoryPeak: string
+    networkLatency: string
+  }
+  dataIntegrity: {
+    candlesValidated: number
+    strategiesValidated: number
+    positionsValidated: number
+    consistencyScore: string
+  }
+}
 
 interface TestPhase {
   id: string
@@ -46,6 +156,24 @@ interface TestState {
     skipped: number
     duration: number
   }
+  metrics?: TestMetrics
+  overview?: TestOverview
+}
+
+interface TestState {
+  phases: TestPhase[]
+  overallStatus: "idle" | "running" | "completed" | "error"
+  currentPhase: string
+  startTime: number
+  summary?: {
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    duration: number
+  }
+  metrics?: TestMetrics
+  overview?: TestOverview
 }
 
 export function ComprehensiveDevModeDialog() {
@@ -313,7 +441,8 @@ export function ComprehensiveDevModeDialog() {
 
         {/* Summary Footer */}
         {testState?.summary && (
-          <div className="border-t pt-3">
+          <div className="border-t pt-3 space-y-4">
+            {/* Quick Summary */}
             <div className="grid grid-cols-4 gap-3 text-xs">
               <div className="bg-muted rounded p-2 text-center">
                 <div className="text-lg font-bold">{testState.summary.total}</div>
@@ -332,6 +461,287 @@ export function ComprehensiveDevModeDialog() {
                 <div className="text-muted-foreground">Duration</div>
               </div>
             </div>
+
+            {/* Metrics Table */}
+            {testState.metrics && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-2.5">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    Test Results Metrics
+                  </h3>
+                </div>
+                <div className="divide-y">
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Test Duration</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.testDuration}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Cpu className="w-3.5 h-3.5" />
+                      <span>CPU Average</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.cpuAverage}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MemoryStick className="w-3.5 h-3.5" />
+                      <span>Memory Average</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.memoryAverage}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Cycle Success Rate</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right text-green-600">{testState.metrics.cycleSuccessRate}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span>Avg Cycle Time</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.avgCycleTime}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Total Cycles</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.totalCycles.toLocaleString()}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Total Indications Generated</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.totalIndicationsGenerated.toLocaleString()}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>Strategies Evaluated</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.strategiesEvaluated.toLocaleString()}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Prehistoric Candles Processed</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.prehistoricCandlesProcessed.toLocaleString()}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>Symbols Loaded</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.symbolsLoaded}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Database Size</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.databaseSize}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Database Keys</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.databaseKeys.toLocaleString()}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Trade Success Rate</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right text-green-600">{testState.metrics.tradeSuccessRate}</div>
+                  </div>
+                  <div className="grid grid-cols-2 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Positions Generated</span>
+                    </div>
+                    <div className="text-sm font-semibold text-right">{testState.metrics.positionsGenerated}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Overview Section */}
+            {testState.overview && (
+              <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    System Overview
+                  </h3>
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Engine Status Row */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-2 h-2 rounded-full ${testState.overview.engineHealth === "healthy" ? "bg-green-500" : "bg-red-500"}`} />
+                        <span className="text-xs text-muted-foreground">Engine Health</span>
+                      </div>
+                      <div className="text-lg font-bold capitalize">{testState.overview.engineHealth}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Database className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Redis Connections</span>
+                      </div>
+                      <div className="text-lg font-bold">{testState.overview.redisConnections}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Market Data</span>
+                      </div>
+                      <div className="text-lg font-bold capitalize">{testState.overview.marketDataStatus}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Layers className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Progression</span>
+                      </div>
+                      <div className="text-lg font-bold capitalize">{testState.overview.progressionPhase}</div>
+                    </div>
+                  </div>
+
+                  {/* Active Strategies */}
+                  <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                    <div className="text-xs font-semibold text-muted-foreground mb-2">Active Strategies by Stage</div>
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{testState.overview.activeStrategies.base}</div>
+                        <div className="text-xs text-muted-foreground">BASE</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-indigo-600">{testState.overview.activeStrategies.main}</div>
+                        <div className="text-xs text-muted-foreground">MAIN</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">{testState.overview.activeStrategies.real}</div>
+                        <div className="text-xs text-muted-foreground">REAL</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-emerald-600">{testState.overview.activeStrategies.live}</div>
+                        <div className="text-xs text-muted-foreground">LIVE</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Throughput & Resources */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <Gauge className="w-3.5 h-3.5" />
+                        Throughput / Minute
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Indications</span>
+                          <span className="font-semibold">{testState.overview.throughputPerMinute.indications.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Strategies</span>
+                          <span className="font-semibold">{testState.overview.throughputPerMinute.strategies.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Cycles</span>
+                          <span className="font-semibold">{testState.overview.throughputPerMinute.cycles.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5" />
+                        Resource Utilization
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">CPU Peak</span>
+                          <span className="font-semibold">{testState.overview.resourceUtilization.cpuPeak}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Memory Peak</span>
+                          <span className="font-semibold">{testState.overview.resourceUtilization.memoryPeak}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Network Latency</span>
+                          <span className="font-semibold">{testState.overview.resourceUtilization.networkLatency}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data Integrity */}
+                  <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                    <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5" />
+                      Data Integrity
+                    </div>
+                    <div className="grid grid-cols-4 gap-3 text-center">
+                      <div>
+                        <div className="text-lg font-bold">{testState.overview.dataIntegrity.candlesValidated.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">Candles</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold">{testState.overview.dataIntegrity.strategiesValidated.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">Strategies</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold">{testState.overview.dataIntegrity.positionsValidated}</div>
+                        <div className="text-xs text-muted-foreground">Positions</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-green-600">{testState.overview.dataIntegrity.consistencyScore}</div>
+                        <div className="text-xs text-muted-foreground">Consistency</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Indication Types & Errors */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2">Indication Types</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {testState.overview.indicationTypes.map((type) => (
+                          <Badge key={type} variant="secondary" className="text-xs">
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2">Test Summary</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Errors</span>
+                          <span className="font-semibold text-red-600">{testState.overview.errorCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Warnings</span>
+                          <span className="font-semibold text-yellow-600">{testState.overview.warningsCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Active Positions</span>
+                          <span className="font-semibold">{testState.overview.activePositions}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

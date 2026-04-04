@@ -276,10 +276,7 @@ export function QuickStartButton() {
           <DetailedLoggingDialog />
         </div>
 
-        {/* Dev Mode Test Button - New Line */}
-        <ComprehensiveDevModeDialog />
-
-        {/* Dev Mode Test Button - New Line */}
+        {/* Dev Mode Test Button */}
         <ComprehensiveDevModeDialog />
 
         {/* Info Box */}
