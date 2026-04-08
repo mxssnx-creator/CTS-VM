@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getRedisClient } from "@/lib/redis-db"
+import { getProgressionLogs } from "@/lib/engine-progression-logs"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -41,14 +42,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        }
      }
 
+    // Also fetch progression logs (including quickstart logs)
+    const progressionLogs = await getProgressionLogs(id)
+    const progressionLogEntries = progressionLogs.map(log => ({
+      id: `prog-${log.timestamp}-${Math.random()}`,
+      timestamp: log.timestamp,
+      level: log.level,
+      category: log.phase || "progression",
+      message: log.message,
+      metadata: {
+        phase: log.phase,
+        details: log.details,
+      },
+      connection_id: id,
+    }))
+
+    // Combine and sort logs by timestamp (newest first)
+    const allLogs = [...logs, ...progressionLogEntries].sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )
+
     return NextResponse.json({
       connection: connection || null,
-      logs: logs || [],
+      logs: allLogs || [],
       summary: {
-        total: logs.length,
-        errors: logs.filter((l: any) => l.level === "error").length,
-        warnings: logs.filter((l: any) => l.level === "warn").length,
-        info: logs.filter((l: any) => l.level === "info").length,
+        total: allLogs.length,
+        errors: allLogs.filter((l: any) => l.level === "error").length,
+        warnings: allLogs.filter((l: any) => l.level === "warn" || l.level === "warning").length,
+        info: allLogs.filter((l: any) => l.level === "info").length,
+        debug: allLogs.filter((l: any) => l.level === "debug").length,
       },
     })
   } catch (error) {
