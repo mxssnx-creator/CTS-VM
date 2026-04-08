@@ -12,18 +12,8 @@ const nextConfig = {
   },
   productionBrowserSourceMaps: false,
   compress: true,
-  // Disable static optimization for pages that need runtime data
-  experimental: {
-    serverComponentsExternalPackages: ['redis'],
-  },
-  // Ensure API routes can run in serverless environment
-  serverRuntimeConfig: {
-    // Will be available in server-side code
-  },
-  publicRuntimeConfig: {
-    // Will be available in client-side code
-    NODE_ENV: process.env.NODE_ENV,
-  },
+  // External packages for server components
+  serverExternalPackages: ['redis'],
 }
 
 export default nextConfig

@@ -1,0 +1,398 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use by an unknown process, using available port 3001 instead.
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3001
+   - Network:      http://10.0.0.1:3001
+
+ ✓ Starting...
+ ○ Compiling /instrumentation ...
+ ✓ Compiled /instrumentation in 550ms (69 modules)
+[v0] CTS v3.2 - Initializing application
+[v0] ==========================================
+[v0] PRE-STARTUP INITIALIZATION STARTED
+[v0] ==========================================
+[v0] [1/10] Initializing Redis with Upstash persistence...
+[v0] [Redis] Client initialized with persistence
+[v0] [Redis] Connection test successful
+[v0] [Connections] ✓ Connection initialization skipped (handled by migrations 011-016)
+[v0] [1/10] ✓ Redis initialized
+[v0] [2/10] Running ALL Redis migrations (automatic)...
+[v0] [Migrations] Current: v0, Target: v17
+[v0] [Migrations] Running 17 pending migrations...
+[v0] [Migrations] Running: 001-initial-schema (v1)
+[v0] Migration 001: Initial schema created
+[v0] [Migrations] ✓ Completed: 001-initial-schema
+[v0] [Migrations] Running: 002-connection-management (v2)
+[v0] Migration 002: Connection management structure created
+[v0] [Migrations] ✓ Completed: 002-connection-management
+[v0] [Migrations] Running: 003-trade-positions-schema (v3)
+[v0] Migration 003: Trade and position schemas created
+[v0] [Migrations] ✓ Completed: 003-trade-positions-schema
+[v0] [Migrations] Running: 004-preset-strategy-management (v4)
+[v0] Migration 004: Preset and strategy management created
+[v0] [Migrations] ✓ Completed: 004-preset-strategy-management
+[v0] [Migrations] Running: 005-user-authentication (v5)
+[v0] Migration 005: User authentication system created
+[v0] [Migrations] ✓ Completed: 005-user-authentication
+[v0] [Migrations] Running: 006-monitoring-logging (v6)
+[v0] Migration 006: Monitoring and logging system created
+[v0] [Migrations] ✓ Completed: 006-monitoring-logging
+[v0] [Migrations] Running: 007-cache-optimization (v7)
+[v0] Migration 007: Cache optimization created
+[v0] [Migrations] ✓ Completed: 007-cache-optimization
+[v0] [Migrations] Running: 008-performance-optimizations (v8)
+[v0] Migration 008: Performance optimizations configured
+[v0] [Migrations] ✓ Completed: 008-performance-optimizations
+[v0] [Migrations] Running: 009-backup-recovery (v9)
+[v0] Migration 009: Backup and recovery system created
+[v0] [Migrations] ✓ Completed: 009-backup-recovery
+[v0] [Migrations] Running: 010-settings-and-metadata (v10)
+[v0] Migration 010: Settings and metadata finalized
+[v0] [Migrations] ✓ Completed: 010-settings-and-metadata
+[v0] [Migrations] Running: 011-seed-predefined-connections (v11)
+[v0] Migration 011: Seeded 11/11 predefined template connections
+[v0] [Migrations] ✓ Completed: 011-seed-predefined-connections
+[v0] [Migrations] Running: 012-finalize-dashboard-connections (v12)
+[v0] Migration 015: Initializing connections (base templates set to predefined=1, disabled)
+[v0] Migration 015: ✓ bybit-x03 -> predefined=1, inserted=0, enabled=0 (template)
+[v0] Migration 015: ✓ bingx-x01 -> predefined=1, inserted=0, enabled=0 (template)
+[v0] Migration 015: ✓ pionex-x01 -> predefined=1, inserted=0, enabled=0 (template)
+[v0] Migration 015: ✓ orangex-x01 -> predefined=1, inserted=0, enabled=0 (template)
+[v0] Migration 015: COMPLETE - 4 base templates, 7 other templates (all disabled)
+[v0] [Migrations] ✓ Completed: 012-finalize-dashboard-connections
+[v0] [Migrations] Running: 013-risk-management-and-engines (v13)
+[v0] Migration 013: Risk management settings and engine controls added
+[v0] [Migrations] ✓ Completed: 013-risk-management-and-engines
+[v0] [Migrations] Running: 014-update-bingx-credentials (v14)
+[v0] Migration 014: Cleared test credentials, real credentials preserved
+[v0] [Migrations] ✓ Completed: 014-update-bingx-credentials
+[v0] [Migrations] Running: 015-fix-connection-inserted-enabled-states (v15)
+[v0] Migration 015: bybit-x03 -> inserted=1, enabled=1, active_inserted=1, dashboard_enabled=1 (base connection)
+[v0] Migration 015: bingx-x01 -> inserted=1, enabled=1, active_inserted=1, dashboard_enabled=1 (base connection)
+[v0] Migration 015: binance-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: okx-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: gateio-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: kucoin-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: mexc-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: bitget-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: pionex-x01 -> inserted=1, enabled=1, active_inserted=1, dashboard_enabled=1 (base connection)
+[v0] Migration 015: orangex-x01 -> inserted=1, enabled=1, active_inserted=1, dashboard_enabled=1 (base connection)
+[v0] Migration 015: huobi-x01 -> inserted=0, enabled=0 (template only)
+[v0] Migration 015: Fixed 4 base connections, 7 template connections
+[v0] [Migrations] ✓ Completed: 015-fix-connection-inserted-enabled-states
+[v0] [Migrations] Running: 016-active-connections-independent-state (v16)
+[v0] Migration 016: BingX credentials available: false
+[v0] Migration 016: Ensuring predefined templates state for 11 connections
+[v0] Migration 016: ✓ bybit-x03 -> inserted=1, enabled=1, active=1 (base connection)
+[v0] Migration 016: ✓ bingx-x01 -> inserted=1, enabled=1, active=1 (base connection)
+[v0] Migration 016: ✓ pionex-x01 -> inserted=1, enabled=1, active=1 (base connection)
+[v0] Migration 016: ✓ orangex-x01 -> inserted=1, enabled=1, active=1 (base connection)
+[v0] Migration 016: COMPLETE - 4 templates verified, 0 user connections updated
+[v0] [Migrations] ✓ Completed: 016-active-connections-independent-state
+[v0] [Migrations] Running: 017-rename-old-connection-fields (v17)
+[v0] Migration 017: Renamed 0 old fields to new names across 11 connections
+[v0] [Migrations] ✓ Completed: 017-rename-old-connection-fields
+[v0] [Migrations] ✓ Successfully migrated v0 -> v17
+[v0] [Migrations] 17 migrations executed
+[v0] [Migrations] ✓ Verification: Schema version is now 17
+[v0] [Migrations] Using fallback credentials for bingx-x01
+[v0] [Migrations] Auto-injected bingx-x01 credentials
+[v0] [Migrations] Injected credentials for 1 connections
+[v0] [2/10] ✓ Migrations: Migrated from v0 to v17 (schema v17)
+[v0] [3/10] Initializing settings...
+[v0] [Seed] Initializing default settings...
+[v0] [Seed] Default settings keys: [
+  'mainEngineIntervalMs',
+  'presetEngineIntervalMs',
+  'strategyUpdateIntervalMs',
+  'realtimeIntervalMs',
+  'mainEngineEnabled',
+  'presetEngineEnabled',
+  'minimum_connect_interval',
+  'theme',
+  'language',
+  'notifications_enabled',
+  'default_leverage',
+  'default_volume',
+  'max_open_positions',
+  'max_drawdown_percent',
+  'daily_loss_limit',
+  'main_symbols',
+  'forced_symbols',
+  'database_type',
+  'restApiDelayMs',
+  'publicRequestDelayMs',
+  'privateRequestDelayMs',
+  'websocketTimeoutMs',
+  'strategyMainMaxPseudoPositionsLong',
+  'strategyMainMaxPseudoPositionsShort'
+]
+[v0] [Seed] Saving to Redis with key 'app_settings'...
+[v0] [Seed] Default settings initialized and saved to Redis: 24 keys
+[v0] [Seed] ✓ Settings verified - successfully saved and retrieved
+[v0] [3/10] ✓ Settings initialized
+[v0] [4/10] Seeding exchange connections...
+[v0] [Seed] Connections seeding DISABLED - only 4 user-created base connections are used
+[v0] [4/10] ✓ Connections seeded
+[v0] [5/10] Seeding market data...
+[v0] [Seed] Starting market data seeding...
+[v0] [Seed] ✓ BTCUSDT: 20 data points
+[v0] [Seed] ✓ ETHUSDT: 20 data points
+[v0] [Seed] ✓ BNBUSDT: 20 data points
+[v0] [Seed] ✓ XRPUSDT: 20 data points
+[v0] [Seed] ✓ ADAUSDT: 20 data points
+[v0] [Seed] ✓ DOGEUSDT: 20 data points
+[v0] [Seed] ✓ LINKUSDT: 20 data points
+[v0] [Seed] ✓ LITUSDT: 20 data points
+[v0] [Seed] ✓ THETAUSDT: 20 data points
+[v0] [Seed] ✓ AVAXUSDT: 20 data points
+[v0] [Seed] ✓ MATICUSDT: 20 data points
+[v0] [Seed] ✓ SOLUSDT: 20 data points
+[v0] [Seed] ✓ UNIUSDT: 20 data points
+[v0] [Seed] ✓ APTUSDT: 20 data points
+[v0] [Seed] ✓ ARBUSDT: 20 data points
+[v0] [Seed] Complete: 300 data points across 15/15 symbols
+[v0] [5/10] ✓ Market data seeded
+[v0] [6/10] Initializing default active connections...
+[v0] [Seed] Initializing default main connections (Bybit & BingX)...
+[v0] [Seed] bybit-x03 already on main list
+[v0] [Seed] bingx-x01 already on main list
+[v0] [Seed] Default main connections initialized: 0 connections added
+[v0] [6/10] ✓ Default active connections initialized
+[v0] [7/10] Testing exchange connections (direct connector test)...
+[v0] [Startup] Testing exchange connections (direct connector test, no HTTP)...
+[v0] [Startup] Testing 1 connections with valid keys (skipping 10 placeholder)
+[v0] [2026-04-08T18:00:41.108Z] WARNING: Invalid contract type - Contract type 'perpetual_futures' not supported for bingx. Supported: spot, perpetual
+[v0] [2026-04-08T18:00:41.108Z] Starting BingX connection test
+[v0] [2026-04-08T18:00:41.108Z] Using endpoint: https://open-api.bingx.com
+[v0] [2026-04-08T18:00:41.108Z] Environment: mainnet
+[v0] [2026-04-08T18:00:41.108Z] Generating signature...
+[v0] [2026-04-08T18:00:41.109Z] Query string: timestamp=1775671241108
+[v0] [2026-04-08T18:00:41.109Z] API Key prefix: 0HTardBdI3...
+[v0] [2026-04-08T18:00:41.109Z] Signature (first 16 chars): 3f9f5ea0465ed0d0...
+[v0] [2026-04-08T18:00:41.109Z] Fetching account balance...
+[v0] [2026-04-08T18:00:41.109Z] [BingX] API Type from credentials: perpetual_futures
+[v0] [2026-04-08T18:00:41.109Z] Contract Type: PERPETUAL FUTURES → Using /openApi/swap/v3/user/balance
+[v0] [BingX] Contract Type: PERPETUAL → Endpoint: /openApi/swap/v3/user/balance
+[v0] [2026-04-08T18:00:41.109Z] Full URL: https://open-api.bingx.com/openApi/swap/v3/user/balance
+[v0] [2026-04-08T18:00:41.376Z] Response status: 200
+[v0] [2026-04-08T18:00:41.376Z] Response code: 0
+[v0] [2026-04-08T18:00:41.376Z] Successfully retrieved account data
+[v0] [2026-04-08T18:00:41.376Z] [Debug] Full response data: {"code":0,"msg":"","data":[{"userId":"1356556045746216965","asset":"USDT","balance":"-0.0011","equity":"-0.0011","unrealizedProfit":"0.0000","realisedProfit":"0","availableMargin":"0.0000","usedMargin":"0.0000","freezedMargin":"0.0000","shortUid":"26450311"},{"userId":"1356556045746216965","asset":"USDC","balance":"0.0000","equity":"0.0000","unrealizedProfit":"0.0000","realisedProfit":"0","availableMargin":"0.0000","usedMargin":"0.0000","freezedMargin":"0.0000","shortUid":"26450311"}]}
+[v0] [2026-04-08T18:00:41.376Z] [Debug] Received 2 balance entries
+[v0] [2026-04-08T18:00:41.376Z] [Debug] First balance entry: {"userId":"1356556045746216965","asset":"USDT","balance":"-0.0011","equity":"-0.0011","unrealizedProfit":"0.0000","realisedProfit":"0","availableMargin":"0.0000","usedMargin":"0.0000","freezedMargin":"0.0000","shortUid":"26450311"}
+[v0] [2026-04-08T18:00:41.376Z] [Debug] USDT entry found: true
+[v0] [2026-04-08T18:00:41.376Z] [Debug] USDT balance value: -0.0011
+[v0] [2026-04-08T18:00:41.635Z] [Debug] BTC/USDT price fetched: $0.00
+[v0] [BingX] Balance parsing - API Type: perpetual_futures, isFutures: true
+[v0] [BingX] Sample balance entry fields: [
+  'userId',
+  'asset',
+  'balance',
+  'equity',
+  'unrealizedProfit',
+  'realisedProfit',
+  'availableMargin',
+  'usedMargin',
+  'freezedMargin',
+  'shortUid'
+]
+[v0] [BingX] Parsed 2 balances, USDT balance: -0.0011
+[v0] [2026-04-08T18:00:41.636Z] ✓ Account balance: -0.0011 USDT
+[v0] [2026-04-08T18:00:41.636Z] ✓ Total assets: 2
+[v0] [2026-04-08T18:00:41.636Z] ✓ BTC price: $0.00
+[v0] [Startup] ✓ BingX X01 (bingx): OK
+[v0] [Startup] Connection testing complete: 1 passed, 0 failed out of 1
+[v0] [7/10] ✓ Connection testing done: 1 passed, 0 failed
+[v0] [8/10] Starting Global Trade Engine Coordinator...
+[v0] GlobalTradeEngineCoordinator initialized with advanced coordination
+[v0] Global trade engine coordinator auto-initialized
+[v0] [Global Engine] Auto-started Global Trade Engine Coordinator
+[v0] [8/10] ✓ Global Trade Engine Coordinator running
+[v0] [9/10] Initializing Trade Engines for active connections...
+[v0] [Auto-Start] Starting trade engine auto-initialization...
+[v0] [Auto-Start] Retrieved 11 connections from database
+[v0] [Auto-Start] Found 1 eligible connections (inserted + enabled + valid keys) out of 11 total
+[v0] Starting TradeEngine for connection: bingx-x01
+[v0] Initializing TradeEngine for connection: bingx-x01
+[v0] TradeEngineManager initialized (timer-based async processor)
+[v0] Created engine state for connection: bingx-x01
+[v0] TradeEngine initialized for connection: bingx-x01
+[v0] [EngineManager] Starting trade engine for connection: bingx-x01
+[v0] [EngineManager] Config: indication=1s, strategy=10s, realtime=3s
+[v0] [Progression] bingx-x01: initializing @ 5% - Setting up engine components...
+[v0] [INFO] [initializing] Engine initialization started 
+[v0] [Engine State] Updated trade_engine_state:bingx-x01: status=running
+[v0] [Engine Flag] engine_is_running:bingx-x01: true
+[v0] [EngineManager] Phase 1/6: Initialized
+[v0] [Progression] bingx-x01: market_data @ 8% - Loading market data for all symbols...
+[v0] [EngineManager] Loaded 1 symbols for connection
+[v0] [MarketData] Loading market data for 1 symbols, timeframe=1m
+[v0] [BingXMarketData] Fetching klines: BTC-USDT 1m limit=250
+[v0] [BingXMarketData] Fetched 250 klines for BTC-USDT
+[v0] [MarketData] BingX API returned 250 candles for BTCUSDT
+[v0] [MarketData] ✓ Loaded BTCUSDT: 250 candles, latest=$71798.00 [bingx]
+[v0] [MarketData] ✅ Successfully loaded market data for 1/1 symbols
+[v0] [EngineManager] Phase 1.5/6: Market data loaded for 1 symbols
+[v0] [Progression] bingx-x01: prehistoric_data @ 15% - Loading historical market data...
+[v0] [EngineManager] Phase 2/6: Starting prehistoric data loading (background)...
+[v0] [Prehistoric] Starting background prehistoric data loading...
+[v0] [EngineManager] Phase 2/6: Prehistoric loading queued (engine will continue)
+[v0] [EngineManager] Phase 3/6: Starting indication processor (1 symbols)
+[v0] [Progression] bingx-x01: indications @ 60% - Processing indications continuously
+[v0] Starting indication processor (interval: 1s, sequential)
+[v0] [EngineManager] Phase 4/6: Starting strategy processor
+[v0] [Progression] bingx-x01: strategies @ 75% - Processing strategies continuously
+[v0] Starting strategy processor (interval: 10s, sequential)
+[v0] [EngineManager] Phase 5/6: Starting real-time processor
+[v0] [Progression] bingx-x01: realtime @ 85% - Monitoring real-time data and positions
+[v0] [Prehistoric] Loading data for 1 symbol(s)
+[v0] Starting realtime processor (interval: 3s, sequential)
+[v0] Starting TradeEngineManager health monitoring (interval: 10s)
+[v0] [Progression] bingx-x01: live_trading @ 100% - Live trading ACTIVE - monitoring 1 symbols
+[v0] [Prehistoric] Settings: days=5, marketTimeframe=1, interval=1m
+[v0] [EngineManager] ✓ Phase 6/6: LIVE TRADING ACTIVE for bingx-x01
+[v0] [EngineManager] ✓ Engine fully initialized
+[v0] [Progression] bingx-x01: prehistoric_data @ 15% - Loading 5 days of 1m data from BingX...
+[v0] [INFO] [engine_started] Trade engine fully started {"symbols":1,"phases":6,"config":{"connectionId":"bingx-x01","indicationInterval":1,"strategyInterval":10,"realtimeInterval":3}}
+[v0] [PrehistoricMarketData] Loading 5 days of data, interval=1m, symbols=1
+[v0] TradeEngine started for connection: bingx-x01
+[v0] [Auto-Start] ✓ Started trade engine for BingX X01
+[v0] [Auto-Start] ✓ Trade engines started: 1/1
+[v0] [Monitor] Connection monitoring DISABLED - connections only assigned on startup
+[v0] [9/10] ✓ Trade Engines initialized and auto-start activated
+[v0] [10/10] Starting periodic connection monitoring...
+[v0] [Periodic] Starting periodic connection testing (every 5 minutes)
+[v0] [10/10] ✓ Periodic testing active (every 5 minutes)
+[v0] ==========================================
+[v0] PRE-STARTUP COMPLETE - SYSTEM READY
+[v0] ==========================================
+[v0] Application ready - all initialization completed in pre-startup
+ ✓ Ready in 3.3s
+[v0] [PrehistoricMarketData] [1/1] BTCUSDT: 1000 candles loaded
+[v0] [PrehistoricMarketData] ✅ Complete: 1/1 symbols
+[v0] [Prehistoric] Complete: 1/1 symbols loaded (5 days, 1m)
+ ○ Compiling / ...
+[v0] [StrategyProcessor] Retrieved 9 indications for BTCUSDT from Redis key=bingx-x01:BTCUSDT:realtime
+[v0] [StrategyFlow] BTCUSDT: Starting progressive evaluation with 9 indications
+[v0] [StrategyCoordinator] BTCUSDT: Live trading enabled=false
+[v0] [StrategyFlow] BTCUSDT STAGE 1: Creating BASE pseudo positions (simulation mode)
+[v0] [StrategyFlow] BTCUSDT BASE: Threshold enforcement - pruned=0, remaining=0
+[v0] [StrategyFlow] BTCUSDT BASE: Created 9 pseudo positions
+[v0] [StrategyFlow] BTCUSDT STAGE 2: Evaluating BASE strategies
+[v0] [StrategyFlow] BTCUSDT BASE EVALUATION: 9/9 passed (maxDDT=999999min, minPF=1)
+[v0] [StrategyFlow] BTCUSDT STAGE 3: Creating MAIN position-state strategies
+[v0] [StrategyFlow] BTCUSDT MAIN: Threshold enforcement - pruned=0, remaining=250
+[v0] [StrategyFlow] BTCUSDT MAIN: Created 1008 position-config strategies from 9 BASE survivors
+[v0] [StrategyFlow] BTCUSDT STAGE 4: Evaluating REAL exchange strategies
+[v0] [StrategyFlow] BTCUSDT REAL EVALUATION: 0/1008 passed (maxDDT=240min, minPF=1.5, confidence=0.65)
+[v0] [StrategyFlow] BTCUSDT STAGE 5: Creating LIVE executable strategies
+[v0] [StrategyFlow] BTCUSDT LIVE: 0/0 ready for trading (maxDDT=60min, minPF=2, confidence=0.75)
+[v0] [StrategyFlow] BTCUSDT COMPLETE: {
+  "symbol": "BTCUSDT",
+  "stages": [
+    {
+      "type": "base",
+      "created": 9,
+      "passed": 9,
+      "failed": 0,
+      "avgPF": "1.01",
+      "avgDDT": "0"
+    },
+    {
+      "type": "main",
+      "created": 1008,
+      "passed": 1008,
+      "failed": -999,
+      "avgPF": "1.12",
+      "avgDDT": "53"
+    },
+    {
+      "type": "real",
+      "created": 1008,
+      "passed": 0,
+      "failed": 1008,
+      "avgPF": "0.00",
+      "avgDDT": "0"
+    },
+    {
+      "type": "live",
+      "created": 0,
+      "passed": 0,
+      "failed": 0,
+      "avgPF": "0.00",
+      "avgDDT": "0"
+    }
+  ]
+}
+[v0] [StrategyFlow] BTCUSDT BASE: 9/9 passed | PF=1.01 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT MAIN: 1008/1008 passed | PF=1.12 | DDT=53min
+[v0] [StrategyFlow] BTCUSDT REAL: 0/1008 passed | PF=0.00 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT LIVE: 0/0 passed | PF=0.00 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT: ✅ READY FOR TRADING - 1017 live strategies created
+[v0] [INFO] [strategies_realtime] Strategy flow completed for BTCUSDT {"stageSummary":{"base":{"created":9,"passed":9,"failed":0,"avgProfitFactor":"1.01","avgDrawdownTime":"0min"},"main":{"created":1008,"passed":1008,"failed":-999,"avgProfitFactor":"1.12","avgDrawdownTi
+[v0] [INFO] [indications] Processed 1 symbols {"cycleDuration_ms":0,"cycleCount":10,"symbolsCount":1}
+ ✓ Compiled / in 8.7s (1134 modules)
+ GET / 200 in 9557ms
+[v0] [StrategyProcessor] Retrieved 18 indications for BTCUSDT from Redis key=bingx-x01:BTCUSDT:realtime
+[v0] [StrategyFlow] BTCUSDT: Starting progressive evaluation with 18 indications
+[v0] [StrategyCoordinator] BTCUSDT: Live trading enabled=false
+[v0] [StrategyFlow] BTCUSDT STAGE 1: Creating BASE pseudo positions (simulation mode)
+[v0] [StrategyFlow] BTCUSDT BASE: Threshold enforcement - pruned=0, remaining=0
+[v0] [StrategyFlow] BTCUSDT BASE: Created 18 pseudo positions
+[v0] [StrategyFlow] BTCUSDT STAGE 2: Evaluating BASE strategies
+[v0] [StrategyFlow] BTCUSDT BASE EVALUATION: 18/18 passed (maxDDT=999999min, minPF=1)
+[v0] [StrategyFlow] BTCUSDT STAGE 3: Creating MAIN position-state strategies
+[v0] [StrategyFlow] BTCUSDT MAIN: Threshold enforcement - pruned=0, remaining=250
+[v0] [StrategyFlow] BTCUSDT MAIN: Created 2016 position-config strategies from 18 BASE survivors
+[v0] [StrategyFlow] BTCUSDT STAGE 4: Evaluating REAL exchange strategies
+[v0] [StrategyFlow] BTCUSDT REAL EVALUATION: 0/2016 passed (maxDDT=240min, minPF=1.5, confidence=0.65)
+[v0] [StrategyFlow] BTCUSDT STAGE 5: Creating LIVE executable strategies
+[v0] [StrategyFlow] BTCUSDT LIVE: 0/0 ready for trading (maxDDT=60min, minPF=2, confidence=0.75)
+[v0] [StrategyFlow] BTCUSDT COMPLETE: {
+  "symbol": "BTCUSDT",
+  "stages": [
+    {
+      "type": "base",
+      "created": 18,
+      "passed": 18,
+      "failed": 0,
+      "avgPF": "1.01",
+      "avgDDT": "0"
+    },
+    {
+      "type": "main",
+      "created": 2016,
+      "passed": 2016,
+      "failed": -1998,
+      "avgPF": "1.12",
+      "avgDDT": "53"
+    },
+    {
+      "type": "real",
+      "created": 2016,
+      "passed": 0,
+      "failed": 2016,
+      "avgPF": "0.00",
+      "avgDDT": "0"
+    },
+    {
+      "type": "live",
+      "created": 0,
+      "passed": 0,
+      "failed": 0,
+      "avgPF": "0.00",
+      "avgDDT": "0"
+    }
+  ]
+}
+[v0] [StrategyFlow] BTCUSDT BASE: 18/18 passed | PF=1.01 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT MAIN: 2016/2016 passed | PF=1.12 | DDT=53min
+[v0] [StrategyFlow] BTCUSDT REAL: 0/2016 passed | PF=0.00 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT LIVE: 0/0 passed | PF=0.00 | DDT=0min
+[v0] [StrategyFlow] BTCUSDT: ✅ READY FOR TRADING - 2034 live strategies created
+[v0] [INFO] [strategies_realtime] Strategy flow completed for BTCUSDT {"stageSummary":{"base":{"created":18,"passed":18,"failed":0,"avgProfitFactor":"1.01","avgDrawdownTime":"0min"},"main":{"created":2016,"passed":2016,"failed":-1998,"avgProfitFactor":"1.12","avgDrawdow
+[v0] [INFO] [indications] Processed 1 symbols {"cycleDuration_ms":1,"cycleCount":20,"symbolsCount":1}
