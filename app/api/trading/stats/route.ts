@@ -28,10 +28,10 @@ function computePnl(pos: any): number {
 }
 
 // Helper to get timestamp from position
-function getTimestamp(pos: any): Date | null {
-  // Try created_at first, then opened_at
+function getTimestamp(pos: any): Date {
+  // Try created_at first, then opened_at, fallback to current time if none
   const ts = pos.created_at || pos.opened_at || pos.calculated_at
-  if (!ts) return null
+  if (!ts) return new Date(Date.now() - 60000) // Fallback: 1 minute ago
   return new Date(ts)
 }
 
@@ -50,15 +50,13 @@ async function getAllPseudoPositions(): Promise<PositionData[]> {
       if (data && Object.keys(data).length > 0) {
         const pnl = computePnl(data)
         const ts = getTimestamp(data)
-        if (ts) {
-          positions.push({
-            id: posId,
-            connectionId: connId,
-            pnl,
-            timestamp: ts,
-            status: data.status,
-          })
-        }
+        positions.push({
+          id: posId,
+          connectionId: connId,
+          pnl,
+          timestamp: ts,
+          status: data.status,
+        })
       }
     }
   }
@@ -71,15 +69,13 @@ async function getAllPseudoPositions(): Promise<PositionData[]> {
     if (data && Object.keys(data).length > 0) {
       const pnl = computePnl(data)
       const ts = getTimestamp(data)
-      if (ts) {
-        positions.push({
-          id: posId,
-          connectionId: data.connection_id,
-          pnl,
-          timestamp: ts,
-          status: data.status,
-        })
-      }
+      positions.push({
+        id: posId,
+        connectionId: data.connection_id,
+        pnl,
+        timestamp: ts,
+        status: data.status,
+      })
     }
   }
 

@@ -26,17 +26,27 @@ export async function GET(req: Request) {
 
     // Get strategy sets from Redis (where they're actually stored)
     const redis = getRedisClient()
+    // Initialize counts before fetching
+    const indicationsByType: Record<string, number> = {
+      base: 0,
+      main: 0,
+      real: 0,
+      live: 0,
+    }
+
     let baseStrategyCount = 0
     let mainStrategyCount = 0
     let realStrategyCount = 0
     let liveStrategyCount = 0
 
     try {
-      // Query Redis for strategy sets (stored by StrategyCoordinator)
-      // Pattern: strategies:{connectionId}:{symbol}:{type}
-      const keys = await redis.keys(`strategies:${connectionId}:*`)
+      // Query Redis for both strategy and indication sets (stored by StrategyCoordinator)
+      // Pattern: strategies:{connectionId}:{symbol}:{type} AND indications:{connectionId}:{symbol}:{type}
+      const strategyKeys = await redis.keys(`strategies:${connectionId}:*`)
+      const indicationKeys = await redis.keys(`indications:${connectionId}:*`)
       
-      for (const key of keys) {
+      // Count strategies
+      for (const key of strategyKeys) {
         const dataJson = await redis.get(key)
         if (dataJson) {
           try {
@@ -52,16 +62,26 @@ export async function GET(req: Request) {
           }
         }
       }
-    } catch (e) {
-      console.log(`[v0] [EngineStats] ${connectionId}: Error reading Redis strategy sets:`, e)
-    }
 
-    // Build response with counts from Redis
-    const indicationsByType: Record<string, number> = {
-      base: 0,
-      main: 0,
-      real: 0,
-      live: 0,
+      // Count indications
+      for (const key of indicationKeys) {
+        const dataJson = await redis.get(key)
+        if (dataJson) {
+          try {
+            const data = JSON.parse(dataJson)
+            const count = data.count || data.indications?.length || 0
+            
+            if (key.includes(":base")) indicationsByType.base += count
+            else if (key.includes(":main")) indicationsByType.main += count
+            else if (key.includes(":real")) indicationsByType.real += count
+            else if (key.includes(":live")) indicationsByType.live += count
+          } catch (e) {
+            // Skip malformed JSON
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`[v0] [EngineStats] ${connectionId}: Error reading Redis sets:`, e)
     }
 
     const strategiesByType: Record<string, number> = {
