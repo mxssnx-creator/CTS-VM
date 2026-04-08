@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getTradeEngine } from "@/lib/trade-engine"
 import { SystemLogger } from "@/lib/system-logger"
 import { sql } from "@/lib/db"
+import { requireAdmin } from "@/lib/auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -14,7 +15,12 @@ export const dynamic = "force-dynamic"
  * - Pauses all active strategies
  * - Logs emergency stop event
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const authCheck = await requireAdmin(request)
+  if (!authCheck.success) {
+    return NextResponse.json(authCheck.response, { status: authCheck.status })
+  }
+
   try {
     console.log("[v0] 🚨 EMERGENCY STOP INITIATED 🚨")
     await SystemLogger.logTradeEngine("🚨 EMERGENCY STOP INITIATED - All trading operations halting", "error")
@@ -70,7 +76,7 @@ export async function POST() {
     console.error("[v0] 🚨 EMERGENCY STOP FAILED:", error)
     
     await SystemLogger.logError(
-      error,
+      error as Error,
       "trade-engine",
       "Emergency Stop API - CRITICAL FAILURE"
     )

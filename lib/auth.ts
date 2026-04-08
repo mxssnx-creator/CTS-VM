@@ -3,7 +3,16 @@ import { SignJWT, jwtVerify } from "jose"
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
 
-const JWT_SECRET_VALUE = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "production-jwt-secret-must-be-overridden-via-env" : crypto.randomUUID())
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable must be set in production!")
+}
+
+if (!process.env.JWT_SECRET) {
+  console.warn("WARNING: JWT_SECRET not set, using auto-generated development secret for development only!")
+}
+
+const JWT_SECRET_VALUE = process.env.JWT_SECRET || crypto.randomUUID()
+
 const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_VALUE)
 
 export interface User {
@@ -101,3 +110,15 @@ export async function verifyAuth(request: Request): Promise<{
     return { authenticated: false, user: null }
   }
 }
+
+export async function requireAdmin(request: Request): Promise<{ success: boolean; status: number; response?: any }> {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated || !auth.user) {
+    return { success: false, status: 401, response: { error: "Unauthorized" } }
+  }
+  if (auth.user.role !== "admin") {
+    return { success: false, status: 403, response: { error: "Admin privileges required" } }
+  }
+  return { success: true, status: 200 }
+}
+

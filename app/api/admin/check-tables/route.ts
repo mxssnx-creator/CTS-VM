@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { getRedisClient, getRedisStats } from "@/lib/redis-db"
+import { requireAdmin } from "@/lib/auth"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authCheck = await requireAdmin(request)
+  if (!authCheck.success) {
+    return NextResponse.json(authCheck.response, { status: authCheck.status })
+  }
   try {
     const client = getRedisClient()
     

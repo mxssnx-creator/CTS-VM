@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server"
 import { initRedis, getRedisClient, flushAll } from "@/lib/redis-db"
 import { runMigrations } from "@/lib/redis-migrations"
+import { requireAdmin } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
-export async function POST() {
+export async function POST(request: Request) {
+  const authCheck = await requireAdmin(request)
+  if (!authCheck.success) {
+    return NextResponse.json(authCheck.response, { status: authCheck.status })
+  }
   try {
     console.log("[v0] === FLUSHING REDIS DATABASE ===")
     
