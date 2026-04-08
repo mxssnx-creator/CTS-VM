@@ -158,8 +158,16 @@ export class BingXConnector extends BaseExchangeConnector {
       // Get BTC price from market data or estimate
       let btcPrice = 0
       try {
-        // Try to fetch current BTC/USDT price
-        const priceResponse = await fetch("https://open-api.bingx.com/openApi/spot/v1/ticker/price?symbol=BTC-USDT")
+        // Try to fetch current BTC/USDT price - use correct endpoint based on api type
+        const apiType = this.credentials.apiType || "perpetual_futures"
+        let priceUrl: string
+        if (apiType === "spot") {
+          priceUrl = `${this.getBaseUrl()}/openApi/spot/v1/ticker/price?symbol=BTC-USDT`
+        } else {
+          priceUrl = `${this.getBaseUrl()}/openApi/swap/v2/quote/price?symbol=BTC-USDT`
+        }
+        
+        const priceResponse = await fetch(priceUrl)
         if (priceResponse.ok) {
           const priceData = await priceResponse.json()
           btcPrice = Number.parseFloat(priceData.data?.price || "0")
@@ -245,7 +253,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -287,7 +295,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -327,7 +335,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -363,7 +371,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -400,7 +408,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}${endpoint}?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -439,7 +447,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/swap/v3/user/positions?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -487,7 +495,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/positionSide/set?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -546,7 +554,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/wallet/v1/query_address?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -582,7 +590,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/wallet/v1/withdraw?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -617,7 +625,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/wallet/v1/query_withdraw_list?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -649,7 +657,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/leverage?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -683,7 +691,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/marginType?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {
@@ -716,7 +724,7 @@ export class BingXConnector extends BaseExchangeConnector {
       }
 
       const signature = this.getSignature(params)
-      const queryString = `${new URLSearchParams(params as Record<string, string>).toString()}&signature=${signature}`
+      const queryString = `${new URLSearchParams(params as any).toString()}&signature=${signature}`
       const url = `${this.getBaseUrl()}/openApi/swap/v3/trade/positionSide/set?${queryString}`
 
       const response = await this.rateLimitedFetch(url, {

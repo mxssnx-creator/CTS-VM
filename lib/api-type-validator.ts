@@ -169,7 +169,7 @@ function normalizeContractType(exchange: string, contractType: string): string {
   if (normalized === "spot" || normalized === "spotapi" || normalized === "cash") {
     return "spot"
   }
-  if (normalized === "perpetual" || normalized === "perpetual_swap" || normalized === "linear_swap" || normalized === "swap" || normalized === "contracts") {
+  if (normalized === "perpetual" || normalized === "perpetual_swap" || normalized === "linear_swap" || normalized === "swap" || normalized === "contracts" || normalized === "perpetual_futures") {
     return "perpetual"
   }
   if (normalized === "futures" || normalized === "delivery" || normalized === "delivery_futures" || normalized === "coin_m") {
