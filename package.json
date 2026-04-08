@@ -9,7 +9,15 @@
     "start": "next start",
     "preinstall": "rm -rf .next node_modules/.cache",
     "prebuild": "echo 'Prebuild checks passed'",
-    "vercel-build": "bash scripts/build-with-workaround.sh"
+    "vercel-build": "bash scripts/build-with-workaround.sh",
+    "setup": "node scripts/setup.js",
+    "db:migrate": "node scripts/db-migrate.js",
+    "db:status": "node scripts/db-status.js",
+    "db:reset": "node scripts/db-reset.js",
+    "db:backup": "node scripts/db-backup.js",
+    "system:check": "node scripts/system-check.js",
+    "system:health": "node scripts/system-health.js",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -48,6 +56,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "dotenv": "^17.4.1",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "jose": "6.1.3",

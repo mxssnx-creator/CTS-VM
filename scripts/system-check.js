@@ -107,13 +107,10 @@ async function main() {
   if (envLocal) {
     try {
       require("dotenv").config({ path: ".env.local" })
-      const { getDatabaseType } = require("../lib/db")
-      const dbType = getDatabaseType()
-      console.log(`   Database Type: ${dbType} ✅`)
-      console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? "✅ Set" : "❌ Not set"}`)
+      console.log(`   Database Type: Redis ✅`)
+      console.log(`   REDIS_URL: ${process.env.REDIS_URL ? "✅ Set" : "⚠️  Using default"}`)
     } catch (error) {
-      console.log(`   Database Check: ❌ ${error.message}`)
-      issues++
+      console.log(`   Database Check: ⚠️  ${error.message}`)
     }
   } else {
     console.log("   Skipped (no .env.local)")

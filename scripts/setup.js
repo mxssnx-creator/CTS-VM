@@ -68,8 +68,8 @@ async function main() {
 
   // Project configuration
   console.log("📝 Project Configuration")
-  const projectName = (await askQuestion("   Project Name (default: CTS-v3): ")) || "CTS-v3"
-  let projectPort = (await askQuestion("   Application Port (default: 3000): ")) || "3000"
+  const projectName = process.env.PROJECT_NAME || (await askQuestion("   Project Name (default: CTS-v3): ")) || "CTS-v3"
+  let projectPort = process.env.PORT || (await askQuestion("   Application Port (default: 3000): ")) || "3000"
 
   // Validate port
   const portNumber = Number.parseInt(projectPort)
@@ -168,8 +168,8 @@ LOG_LEVEL=info
 
   // Build
   console.log("🏗️  Production Build")
-  const buildAnswer = await askQuestion("   Run production build? [Y/n]: ")
-  const shouldBuild = buildAnswer.toLowerCase() !== "n"
+  const buildAnswer = process.env.BUILD_PRODUCTION || (await askQuestion("   Run production build? [Y/n]: ")) || "n"
+  const shouldBuild = buildAnswer.toLowerCase() === "y"
 
   if (shouldBuild) {
     console.log("   Building application...\n")
