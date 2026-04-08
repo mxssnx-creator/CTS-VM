@@ -128,7 +128,7 @@ export class ApiErrorHandler {
       // Log to database
       if (error.severity === "critical") {
         try {
-          await SystemLogger.logError(error, userId || "system", operation || endpoint)
+          await SystemLogger.logError(userId || "system", error, operation || endpoint)
         } catch (logError) {
           console.error("[v0] Failed to log error:", logError)
         }
@@ -154,7 +154,7 @@ export class ApiErrorHandler {
       // Log critical errors
       if (severity === "critical") {
         try {
-          await SystemLogger.logError(error, userId || "system", operation || endpoint)
+          await SystemLogger.logError(userId || "system", error, operation || endpoint)
         } catch (logError) {
           console.error("[v0] Failed to log error:", logError)
         }

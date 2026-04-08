@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(status)
   } catch (error) {
     console.error("[v0] Failed to fetch connection status:", error)
-    await SystemLogger.logError(error, "api", "GET /api/connections/status/[id]")
+    await SystemLogger.logError("api", error, "GET /api/connections/status/[id]")
     return NextResponse.json({ error: "Failed to fetch connection status" }, { status: 500 })
   }
 }

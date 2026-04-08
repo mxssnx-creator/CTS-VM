@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Get audit logs for this user
     const logs = await auditLogger.exportLogs({
-      user_id: user.id,
+      user_id: user.id.toString(),
       start_date: startDate,
       end_date: endDate,
     })

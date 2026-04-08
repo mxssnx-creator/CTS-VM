@@ -53,14 +53,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           // Interesect the filter sets
           const tempSetKey = `temp:intersect:${Date.now()}`
           await redis.sInterStore(tempSetKey, setKeys)
-          configIds = await redis.sMembers(tempSetKey)
+          configIds = await redis.smembers(tempSetKey)
           await redis.del(tempSetKey)
         } else {
-          configIds = await redis.sMembers(configIdsSetKey)
+          configIds = await redis.smembers(configIdsSetKey)
         }
       } else {
         // Get all active config IDs for this preset
-        configIds = await redis.sMembers(configIdsSetKey)
+        configIds = await redis.smembers(configIdsSetKey)
       }
 
       // Get sorted order by profit_factor (use ZREVRANGE from profit_factor_scores)
@@ -85,7 +85,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const testResultIds: string[] = []
 
       configIds.forEach(configId => {
-        pipeline.hGetAll(`preset:active-config:${configId}`)
+        pipeline.hgetall(`preset:active-config:${configId}`)
       })
 
       const results = await pipeline.exec()

@@ -57,7 +57,7 @@ export async function GET() {
     return NextResponse.json(statuses)
   } catch (error) {
     console.error("[v0] Failed to fetch connection statuses:", error)
-    await SystemLogger.logError(error, "api", "GET /api/connections/status")
+    await SystemLogger.logError("api", error, "GET /api/connections/status")
     return NextResponse.json({ error: "Failed to fetch connection statuses", statuses: [] }, { status: 500 })
   }
 }

@@ -22,17 +22,15 @@ export async function getActiveIndications(
     let ids: string[] = []
     
     if (symbol) {
-      ids = await client.sMembers(`indications:${symbol}`)
-    } else if (connectionId) {
-      ids = await client.sMembers(`indications:${connectionId}`)
-    } else {
-      ids = await client.sMembers("indications:all")
+      ids = await client.smembers(`indications:${symbol}`)
+      ids = await client.smembers(`indications:${connectionId}`)
+      ids = await client.smembers("indications:all")
     }
     
     const indications = await Promise.all(
       ids.map(async (id) => {
-        const data = await client.hGetAll(`indication:${id}`)
-        if (Object.keys(data).length > 0) {
+        const data = await client.hgetall(`indication:${id}`)
+        if (data && Object.keys(data).length > 0) {
           return {
             id,
             ...data,
@@ -104,17 +102,15 @@ export async function getActiveStrategies(
     let ids: string[] = []
     
     if (symbol) {
-      ids = await client.sMembers(`strategies:${symbol}`)
-    } else if (connectionId) {
-      ids = await client.sMembers(`strategies:${connectionId}`)
-    } else {
-      ids = await client.sMembers("strategies:all")
+      ids = await client.smembers(`strategies:${symbol}`)
+      ids = await client.smembers(`strategies:${connectionId}`)
+      ids = await client.smembers("strategies:all")
     }
     
     const strategies = await Promise.all(
       ids.map(async (id) => {
-        const data = await client.hGetAll(`strategy:${id}`)
-        if (Object.keys(data).length > 0) {
+        const data = await client.hgetall(`strategy:${id}`)
+        if (data && Object.keys(data).length > 0) {
           return {
             id,
             ...data,
@@ -184,15 +180,15 @@ export async function getAllPositions(connectionId?: string) {
     let ids: string[] = []
     
     if (connectionId) {
-      ids = await client.sMembers(`positions:${connectionId}`)
+      ids = await client.smembers(`positions:${connectionId}`)
     } else {
-      ids = await client.sMembers("positions:all")
+      ids = await client.smembers("positions:all")
     }
     
     const positions = await Promise.all(
       ids.map(async (id) => {
-        const data = await client.hGetAll(`position:${id}`)
-        if (Object.keys(data).length > 0) {
+        const data = await client.hgetall(`position:${id}`)
+        if (data && Object.keys(data).length > 0) {
           return {
             id,
             ...data,
