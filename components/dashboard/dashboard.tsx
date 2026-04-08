@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useExchange } from "@/lib/exchange-context"
 import { useConnectionState } from "@/lib/connection-state"
 import { SystemOverview } from "./system-overview"
+import { FunctionalOverview } from "./functional-overview"
 import { GlobalTradeEngineControls } from "./global-trade-engine-controls"
 import { DashboardActiveConnectionsManager } from "./dashboard-active-connections-manager"
 import { IntervalsStrategiesOverview } from "./intervals-strategies-overview"
@@ -159,6 +160,11 @@ export function Dashboard() {
       {/* Smart Overview - Comprehensive system status */}
       <ErrorBoundary name="System Overview">
         <SystemOverview />
+      </ErrorBoundary>
+
+      {/* Functional Overview - Real-time processing metrics */}
+      <ErrorBoundary name="Functional Overview">
+        <FunctionalOverview />
       </ErrorBoundary>
 
       {/* Trade Engine Controls */}
