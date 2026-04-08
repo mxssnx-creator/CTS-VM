@@ -13,6 +13,7 @@
 import { initRedis, getSettings, setSettings } from "@/lib/redis-db"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { PositionThresholdManager } from "@/lib/position-threshold-manager"
+import { trackStrategyStats } from "@/lib/statistics-tracker"
 
 export interface EvaluationMetrics {
   maxDrawdownTime: number // in minutes
@@ -118,6 +119,19 @@ export class StrategyCoordinator {
 
       // Log progression
       await this.logStrategyProgression(symbol, results)
+      
+      // Track strategy statistics for each stage
+      for (const result of results) {
+        await trackStrategyStats(
+          this.connectionId,
+          symbol,
+          result.type,
+          result.totalCreated,
+          result.passedEvaluation,
+          result.avgProfitFactor,
+          result.avgDrawdownTime
+        )
+      }
 
       return results
     } catch (error) {

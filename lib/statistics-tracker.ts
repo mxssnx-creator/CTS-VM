@@ -1,4 +1,4 @@
-import { getRedisClient } from "@/lib/redis-db";
+import { getRedisClient, initRedis } from "@/lib/redis-db";
 
 const MAX_ENTRIES = 10000; // keep last 10k entries per connection
 
@@ -21,6 +21,7 @@ export async function trackIndicationStats(
   value: number,
   confidence: number
 ): Promise<void> {
+  await initRedis();
   const client = getRedisClient();
   const entry = {
     id: `ind_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -49,6 +50,7 @@ export async function trackStrategyStats(
   profitFactor: number,
   drawdownTimeMinutes: number
 ): Promise<void> {
+  await initRedis();
   const client = getRedisClient();
   const entry = {
     id: `str_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -70,6 +72,7 @@ export async function trackStrategyStats(
  * Get recent indication statistics for main page
  */
 export async function getIndicationStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
+  await initRedis();
   const client = getRedisClient();
   const key = getIndicationsKey(connectionId);
   const allEntries = await client.lrange(key, 0, -1);
@@ -113,6 +116,7 @@ export async function getIndicationStats(connectionId: string, hoursBack: number
  * Get recent strategy statistics for main page
  */
 export async function getStrategyStats(connectionId: string, hoursBack: number = 24): Promise<any[]> {
+  await initRedis();
   const client = getRedisClient();
   const key = getStrategiesKey(connectionId);
   const allEntries = await client.lrange(key, 0, -1);

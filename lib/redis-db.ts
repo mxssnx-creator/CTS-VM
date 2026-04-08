@@ -207,6 +207,7 @@ export class InlineLocalRedis {
   }
 
   async hmset(...args: string[]): Promise<void> {
+    this.trackOperation()
     if (args.length < 3) return
     const key = args[0]
     const obj: Record<string, string> = {}
@@ -401,6 +402,7 @@ export class InlineLocalRedis {
     const len = list.length
     const normalizedStart = start < 0 ? Math.max(0, len + start) : start
     const normalizedStop = stop < 0 ? len + stop : stop
+    // Redis ltrim uses inclusive indices, slice is end-exclusive so we need +1
     const trimmed = list.slice(normalizedStart, normalizedStop + 1)
     this.data.lists.set(key, trimmed)
   }
