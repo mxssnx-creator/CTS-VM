@@ -33,8 +33,15 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "Build completed successfully!"
     exit 0
   fi
-  
-  # Check if compilation succeeded (pages were generated)
+
+  # For Vercel deployment, don't ignore real errors
+  if [[ "$VERCEL" == "1" ]]; then
+    echo ""
+    echo "Vercel deployment detected - exiting with actual error code"
+    exit $exit_code
+  fi
+
+  # Check if compilation succeeded (pages were generated) - only for local builds
   if echo "$output" | grep -q "Compiled successfully"; then
     # Check if all pages were generated
     if echo "$output" | grep -q "Generating static pages"; then

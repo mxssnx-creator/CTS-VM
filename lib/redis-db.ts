@@ -451,13 +451,43 @@ export class InlineLocalRedis {
   }
 }
 
-let redisInstance: InlineLocalRedis | null = null
+let redisInstance: InlineLocalRedis | any = null
 let isConnected = false
 let connectionsInitialized = false
 
 export async function initRedis(): Promise<void> {
   if (isConnected) return
 
+  // Check if Upstash Redis is configured (for production/Vercel)
+  const redisUrl = process.env.REDIS_URL
+  const redisPassword = process.env.REDIS_PASSWORD
+
+  if (redisUrl && redisPassword) {
+    // Use Upstash Redis for production
+    try {
+      // Dynamic import to avoid issues in client components
+      const { createClient } = await import('redis')
+
+      redisInstance = createClient({
+        url: redisUrl,
+        password: redisPassword,
+      }) as any
+
+      await redisInstance.connect()
+
+      // Test connection
+      const pong = await redisInstance.ping()
+      if (pong === "PONG") {
+        isConnected = true
+        console.log("[v0] [Redis] Connected to Upstash Redis (production)")
+        return
+      }
+    } catch (error) {
+      console.warn("[v0] [Redis] Failed to connect to Upstash Redis, falling back to local:", error)
+    }
+  }
+
+  // Fallback to local in-memory Redis (development)
   if (!redisInstance) {
     redisInstance = new InlineLocalRedis()
     await redisInstance.load()

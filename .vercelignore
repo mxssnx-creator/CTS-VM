@@ -9,3 +9,43 @@ out/
 
 # Cache
 .turbo/
+.cache
+.parcel-cache
+
+# Development files
+scripts/
+docs/
+*.md
+!README.md
+
+# Data files
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env*.local
+.env.development
+.env.test
+
+# Debug files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
