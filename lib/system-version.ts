@@ -6,12 +6,13 @@ export const SYSTEM_VERSION = "2026.02.26.v4.5"
 // Component versions - track UI code changes
 // Increment on component modifications that require browser cache refresh
 export const COMPONENT_VERSIONS = {
-  mainManager: "v6", // Main active connections manager - v6: renamed dashboard to main, inserted to assigned
+  mainManager: "v6", // Main active connections manager - v6: added is_main_assigned validation
   statisticsOverview: "v4", // Statistics overview widget - v4: separated indications from strategies
   systemInitializer: "v3", // System initialization - v3: added comprehensive version logging
   connectionState: "v2", // Connection state management
   globalControls: "v2", // Global trade engine controls
   addConnectionDialog: "v2", // Add connection dialog
+  dashboardManager: "v5", // Dashboard active connections manager - v5: fixed is_main_assigned validation
 } as const
 
 // API versions - track backend changes

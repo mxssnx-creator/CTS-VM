@@ -37,7 +37,7 @@ import {
 import { ConnectionInfoDialog } from "@/components/settings/connection-info-dialog"
 import { ConnectionSettingsDialog } from "@/components/settings/connection-settings-dialog"
 import { ProgressionLogsDialog } from "@/components/dashboard/progression-logs-dialog"
-import type { Connection } from "@/lib/redis-db"
+import type { Connection } from "@/lib/file-storage"
 import type { ActiveConnection } from "@/lib/active-connections"
 import { toast } from "@/lib/simple-toast"
 
@@ -103,8 +103,8 @@ export function ActiveConnectionCard({
   // Sync local toggle states from connection details
   useEffect(() => {
     if (details) {
-      setLiveTrade(details.is_live_trade === true || details.is_live_trade === "1" || (details.is_live_trade as string) === "true")
-      setPresetMode(details.is_preset_trade === true || details.is_preset_trade === "1" || (details.is_preset_trade as string) === "true")
+      setLiveTrade(details?.is_live_trade ?? false)
+      setPresetMode(details?.is_preset_trade ?? false)
     }
   }, [details])
 
@@ -384,12 +384,12 @@ export function ActiveConnectionCard({
                   <span className="text-green-600 dark:text-green-400 font-medium">Live</span>
                 </>
               )}
-              {details?.last_test_time && (
+              {details?.last_test_at && (
                 <>
                   <span className="text-muted-foreground/50">|</span>
                   <span className="flex items-center gap-0.5">
                     <Clock className="h-3 w-3" />
-                    {new Date(details.last_test_time).toLocaleTimeString()}
+                    {new Date(details.last_test_at).toLocaleTimeString()}
                   </span>
                 </>
               )}

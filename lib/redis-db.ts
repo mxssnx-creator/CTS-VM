@@ -552,60 +552,98 @@ function flattenForHmset(obj: Record<string, string>): string[] {
  * Maps old field names (dashboard/inserted) to new names (main/assigned).
  * This ensures all downstream code works regardless of which field names exist in Redis.
  */
-function normalizeConnectionFields(data: Record<string, string>): Record<string, string> {
-  if (!data) return data
-  const normalized = { ...data }
+import { Connection } from "@/lib/file-storage"
 
-  // Field name mappings: old -> new
-  const fieldMappings: Record<string, string> = {
-    is_enabled_dashboard: "is_main_enabled",
-    is_active_inserted: "is_active_assigned",
-    is_inserted: "is_assigned",
-    is_dashboard_inserted: "is_main_assigned",
-  }
+// ... existing code ...
 
-  for (const [oldField, newField] of Object.entries(fieldMappings)) {
-    // If old field exists and new field doesn't, copy value to new field
-    if (normalized[oldField] !== undefined && normalized[oldField] !== null && normalized[oldField] !== "") {
-      if (!normalized[newField]) {
-        normalized[newField] = normalized[oldField]
-      }
-      // Delete old field to keep data clean
-      delete normalized[oldField]
-    }
-  }
+function normalizeConnectionFields(data: Record<string, string>): Connection {
+   if (!data) return data as Connection
+   const normalized = { ...data }
 
-  return normalized
-}
+   // Field name mappings: old -> new
+   const fieldMappings: Record<string, string> = {
+     is_enabled_dashboard: "is_main_enabled",
+     is_active_inserted: "is_active_assigned",
+     is_inserted: "is_assigned",
+     is_dashboard_inserted: "is_main_assigned",
+   }
 
-export async function getAllConnections(): Promise<any[]> {
-  const client = getClient()
-  const connIds = await client.smembers("connections")
+   for (const [oldField, newField] of Object.entries(fieldMappings)) {
+     // If old field exists and new field doesn't, copy value to new field
+     if (normalized[oldField] !== undefined && normalized[oldField] !== null && normalized[oldField] !== "") {
+       if (!normalized[newField]) {
+         normalized[newField] = normalized[oldField]
+       }
+       // Delete old field to keep data clean
+       delete normalized[oldField]
+     }
+   }
 
-  if (!connIds || connIds.length === 0) {
-    console.log("[v0] [Connections] No connections found in set")
-    return []
-  }
+   // Convert string values to proper types
+   const booleanFields = [
+     "is_testnet", "is_enabled", "is_live_trade", "is_preset_trade", "is_active", "is_predefined",
+     "demo_mode", "is_main_enabled", "is_active_assigned", "is_assigned", "is_main_assigned"
+   ]
+   const numberFields = [
+     "user_id", "exchange_id", "volume_factor", "last_test_balance",
+     "last_test_timestamp", "api_capabilities"
+   ]
+   const jsonFields = [
+     "connection_settings", "last_test_log", "api_capabilities"
+   ]
+   const dateFields = [
+     "created_at", "updated_at", "last_test_at", "last_test_timestamp"
+   ]
 
-  const connections = []
-  for (const id of connIds) {
-    const data = await client.hgetall(`connection:${id}`)
-    if (data && Object.keys(data).length > 0) {
-      connections.push(normalizeConnectionFields(data))
-    }
-  }
+   for (const [key, value] of Object.entries(normalized)) {
+     if (booleanFields.includes(key)) {
+       // Convert string to boolean: "1", "true", "TRUE" -> true; "0", "false", "FALSE" -> false
+       normalized[key] = value === "1" || value === "true" || value === "TRUE" || value === true
+     } else if (numberFields.includes(key)) {
+       // Convert string to number
+       const num = Number(value)
+       normalized[key] = isNaN(num) ? undefined : num
+     } else if (jsonFields.includes(key)) {
+       try {
+         normalized[key] = JSON.parse(value)
+       } catch (e) {
+         // Keep as string if parsing fails
+       }
+     }
+     // Date fields remain as strings (ISO format)
+   }
 
-  return connections
-}
+   return normalized as Connection
+ }
 
-export async function getConnection(id: string): Promise<any | null> {
-  const client = getClient()
-  const data = await client.hgetall(`connection:${id}`)
-  if (data && Object.keys(data).length > 0) {
-    return normalizeConnectionFields(data)
-  }
-  return null
-}
+ export async function getAllConnections(): Promise<Connection[]> {
+   const client = getClient()
+   const connIds = await client.smembers("connections")
+
+   if (!connIds || connIds.length === 0) {
+     console.log("[v0] [Connections] No connections found in set")
+     return []
+   }
+
+   const connections = []
+   for (const id of connIds) {
+     const data = await client.hgetall(`connection:${id}`)
+     if (data && Object.keys(data).length > 0) {
+       connections.push(normalizeConnectionFields(data))
+     }
+   }
+
+   return connections
+ }
+
+ export async function getConnection(id: string): Promise<Connection | null> {
+   const client = getClient()
+   const data = await client.hgetall(`connection:${id}`)
+   if (data && Object.keys(data).length > 0) {
+     return normalizeConnectionFields(data)
+   }
+   return null
+ }
 
 export async function createConnection(data: Record<string, any>): Promise<void> {
   const client = getClient()

@@ -58,6 +58,12 @@ export interface Connection {
   api_capabilities?: string
   created_at: string
   updated_at: string
+
+  // Additional fields for dashboard and connection management
+  is_main_enabled?: boolean
+  is_active_assigned?: boolean
+  is_assigned?: boolean
+  is_main_assigned?: boolean
 }
 
 export interface Settings {

@@ -188,7 +188,7 @@ export function Dashboard() {
       {filteredConnections.length > 0 && (
         <div className="col-span-full">
           <ErrorBoundary name="Statistics Overview">
-            <StatisticsOverviewV2 connections={filteredConnections} />
+            <StatisticsOverviewV2 connections={filteredConnections.map(c => ({ id: c.connectionId, name: c.exchangeName }))} />
           </ErrorBoundary>
         </div>
       )}

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, AlertTriangle, RotateCcw } from "lucide-react"
 import { toast } from "@/lib/simple-toast"
-import type { Connection } from "@/lib/redis-db"
+import type { Connection } from "@/lib/file-storage"
 import type { ActiveConnection } from "@/lib/active-connections"
 import { BASE_EXCHANGES } from "@/lib/connection-utils"
 import { COMPONENT_VERSIONS } from "@/lib/system-version"
@@ -77,18 +77,14 @@ export function DashboardActiveConnectionsManager() {
         const exchange = (conn.exchange || "").toLowerCase().trim()
         const isBase = BASE_EXCHANGES.includes(exchange)
 
-        // is_active_assigned = "1" means this connection is in Active panel
-        // This applies to BOTH predefined templates (when enabled) AND user-created connections
-        const isActiveInserted =
-          conn.is_active_assigned === "1" ||
-          conn.is_active_assigned === true ||
-          conn.is_main_assigned === "1" ||
-          conn.is_main_assigned === true
+// is_active_assigned = true means this connection is in Active panel
+         // This applies to BOTH predefined templates (when enabled) AND user-created connections
+         const isActiveInserted = conn.is_active_assigned ? true : false
+         // is_main_assigned = true means this connection is assigned to Main (another flag)
+         const isMainAssigned = conn.is_main_assigned ? true : false
 
-        // isEnabledDashboard = connection's dashboard toggle is ON (processing enabled)
-        const isEnabledDashboard =
-          conn.is_main_enabled === true ||
-          conn.is_main_enabled === "1"
+         // isEnabledDashboard = connection's dashboard toggle is ON (processing enabled)
+         const isEnabledDashboard = conn.is_main_enabled ? true : false
 
         if (isBase && isActiveInserted) {
           if (seenIds.has(conn.id)) continue

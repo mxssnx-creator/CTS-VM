@@ -35,7 +35,11 @@ interface FunctionalOverview {
   }
 }
 
-export function QuickStartButton() {
+export interface QuickStartButtonProps {
+  onQuickStartComplete?: () => void
+}
+
+export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [functionalOverview, setFunctionalOverview] = useState<FunctionalOverview | null>(null)
   const [steps, setSteps] = useState<QuickStartStep[]>([
@@ -185,8 +189,11 @@ export function QuickStartButton() {
         console.warn("[v0] [QuickStart] Overview unavailable:", e)
       }
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("engine-state-changed", { detail: { running: true } }))
+if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("engine-state-changed", { 
+          detail: { running: true } 
+        }))
+        onQuickStartComplete?.()
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error"
