@@ -2,13 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   typescript: {
-    ignoreBuildErrors: process.env.NODE_ENV === 'production',
+    ignoreBuildErrors: process.env.VERCEL_ENV === 'production',
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: process.env.VERCEL_ENV === 'production',
   },
   images: {
-    unoptimized: true,
+    unoptimized: process.env.VERCEL_ENV === 'preview',
   },
   productionBrowserSourceMaps: false,
   compress: true,

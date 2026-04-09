@@ -5,17 +5,15 @@
     "NODE_ENV": "production"
   },
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    }
-  ],
+  "regions": ["iad1", "sfo1", "cdg1"],
   "functions": {
     "app/api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 10
+      "memory": 2048,
+      "maxDuration": 30
     }
+  },
+  "preview": {
+    "enabled": true,
+    "source": "all"
   }
 }
