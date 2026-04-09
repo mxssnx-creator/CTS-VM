@@ -254,8 +254,8 @@ export function ActiveConnectionCard({
     }
   }
 
-  const phase = progression?.phase || "idle"
-  const progress = progression?.progress || 0
+  const phase = progression?.phase ?? "idle"
+  const progress = progression?.progress ?? 0
   const isRunning = phase === "live_trading"
   const isStarting = phase !== "idle" && phase !== "stopped" && phase !== "live_trading" && phase !== "error" && progress < 100
   const hasError = phase === "error"

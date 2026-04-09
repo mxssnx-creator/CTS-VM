@@ -129,14 +129,14 @@ export function Dashboard() {
       }
       
       setStats({
-        activeConnections: data.activeConnections || 0,
-        totalPositions: data.totalPositions || 0,
-        dailyPnL: data.dailyPnL || 0,
-        totalBalance: data.totalBalance || 0,
-        indicationsActive: sysData.engines?.indications?.resultsCount || 0,
-        strategiesActive: sysData.engines?.strategies?.resultsCount || 0,
-        systemLoad: sysData.cpu || 0,
-        databaseSize: sysData.database?.keys || 0,
+        activeConnections: data.activeConnections ?? 0,
+        totalPositions: data.totalPositions ?? 0,
+        dailyPnL: data.dailyPnL ?? 0,
+        totalBalance: data.totalBalance ?? 0,
+        indicationsActive: sysData.engines?.indications?.resultsCount ?? 0,
+        strategiesActive: sysData.engines?.strategies?.resultsCount ?? 0,
+        systemLoad: sysData.cpu ?? 0,
+        databaseSize: sysData.database?.keys ?? 0,
       })
     } catch (error) {
       console.error("Failed to load stats:", error)

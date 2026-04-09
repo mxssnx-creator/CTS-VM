@@ -72,11 +72,11 @@ export function GlobalTradeEngineControls() {
         const statusData: EngineStatus = {
           running: data.running === true || data.running === "true" || data.status === "running",
           paused: data.paused === true || data.paused === "true",
-          connectedExchanges: data.connectedExchanges || data.summary?.total || 0,
-          activePositions: data.activePositions || data.summary?.totalPositions || 0,
-          totalProfit: data.totalProfit || 0,
-          uptime: data.uptime || 0,
-          lastUpdate: new Date(data.lastUpdate || Date.now()),
+          connectedExchanges: data.connectedExchanges ?? data.summary?.total ?? 0,
+          activePositions: data.activePositions ?? data.summary?.totalPositions ?? 0,
+          totalProfit: data.totalProfit ?? 0,
+          uptime: data.uptime ?? 0,
+          lastUpdate: new Date(data.lastUpdate ?? Date.now()),
           cycleStats: data.cycleStats,
         }
         console.log(`[v0] [Engine] Parsed status: running=${statusData.running}, paused=${statusData.paused}`)
