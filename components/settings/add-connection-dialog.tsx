@@ -52,7 +52,7 @@ export function AddConnectionDialog({ open, onOpenChange, onConnectionAdded, sho
   
   const [formData, setFormData] = useState({
     name: "",
-    exchange: "bybit",
+    exchange: "bingx",
     api_type: "perpetual_futures",
     api_subtype: "perpetual",
     connection_method: "rest",
