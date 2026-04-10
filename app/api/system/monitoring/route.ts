@@ -126,7 +126,7 @@ export async function GET() {
         sets,
         positions1h,
         entries1h,
-        requestsPerSecond: Math.max(1, requestsPerSecond), // Show at least 1 if active
+        requestsPerSecond,
       },
       services: {
         tradeEngine: engineRunning,

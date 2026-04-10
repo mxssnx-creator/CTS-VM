@@ -86,6 +86,11 @@ export async function GET() {
     const totalKeys = Array.isArray(allRedisKeys) ? allRedisKeys.length : 0
     console.log(`[v0] [SystemStats] Total DB keys: ${totalKeys}`)
 
+    // Calculate actual live trades in last hour (position keys)
+    const liveTradesLastHour = allRedisKeys.filter((k: string) => 
+      k.startsWith("position:") && !k.includes(":historical")
+    ).length
+
     // Trade Engine Status from Redis (stored as hash, not string)
     let globalEngineState: any = {}
     try {
@@ -178,7 +183,7 @@ export async function GET() {
         return !(ai === true || ai === "1" || ai === "true")
       }).length,
       liveTrades: {
-        lastHour: 0,
+        lastHour: liveTradesLastHour,
         topConnections: [],
       },
       // DEBUG: Help understand what's being counted
