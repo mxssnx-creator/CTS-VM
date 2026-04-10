@@ -72,7 +72,7 @@ export class ProgressionLimitsManager {
         priceStep: 100,
       },
       combined: {
-        maxOpenPositions: 5,
+        maxOpenPositions: 500,
         maxDrawdown: -0.2, // -20%
         maxHoldTime: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
       },

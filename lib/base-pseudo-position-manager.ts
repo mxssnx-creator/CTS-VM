@@ -77,6 +77,19 @@ export class BasePseudoPositionManager {
         lastPartRatio,
       })
 
+      // ENFORCE: Max 1 pseudo position per direction per (indication + strategy config) combination
+      const existingPerDirection = basePositions.find((p: any) =>
+        p.symbol === symbol &&
+        p.indication_type === indicationType &&
+        p.indication_range === range &&
+        p.direction === direction
+      )
+
+      if (existingPerDirection) {
+        console.log(`[v0] Already have base position for ${symbol} ${indicationType} range=${range} direction=${direction}: ${existingPerDirection.id}`)
+        return existingPerDirection.id
+      }
+
       const existing = basePositions.find((p: any) => p.config_key === configKey)
 
       if (existing) {

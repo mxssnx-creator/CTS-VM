@@ -128,8 +128,8 @@ export class StrategySetsProcessor {
     for (const indication of indications) {
       try {
         total++
-        // Base: Only highest confidence indications (>0.8) with profit factor > 1.5
-        if (indication.confidence > 0.8 && indication.profitFactor > 1.5) {
+        // Base: Only highest confidence indications (>0.8) with profit factor > 1.2
+        if (indication.confidence > 0.8 && indication.profitFactor > 1.2) {
           const strategy = {
             profitFactor: indication.profitFactor * 0.9, // Conservative discount
             confidence: indication.confidence,
@@ -160,8 +160,8 @@ export class StrategySetsProcessor {
     for (const indication of indications) {
       try {
         total++
-        // Main: Confidence >0.6 with profit factor > 1.2
-        if (indication.confidence > 0.6 && indication.profitFactor > 1.2) {
+        // Main: Confidence >0.6 with profit factor > 1.4
+        if (indication.confidence > 0.6 && indication.profitFactor > 1.4) {
           const strategy = {
             profitFactor: indication.profitFactor,
             confidence: indication.confidence,

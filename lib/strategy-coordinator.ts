@@ -47,13 +47,13 @@ export class StrategyCoordinator {
   private readonly METRICS: Record<string, EvaluationMetrics> = {
     base: {
       maxDrawdownTime: 999999, // No limit - create all
-      minProfitFactor: 1.0, // Minimum threshold only
+      minProfitFactor: 1.2, // Minimum threshold only
       confidence: 0.3,
       description: "All qualifying pseudo positions"
     },
     main: {
       maxDrawdownTime: 1440, // 24 hours
-      minProfitFactor: 1.2,
+      minProfitFactor: 1.4,
       confidence: 0.5,
       description: "Position-state specific strategies"
     },
