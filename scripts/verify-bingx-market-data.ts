@@ -26,12 +26,12 @@ async function testBingXMarketData() {
   if (bingxConn && bingxConn.api_key && bingxConn.api_key.length > 10) {
     console.log(`Using BingX connection: ${bingxConn.id}`)
     console.log(`API Type: ${bingxConn.api_type || "perpetual_futures"}`)
-    console.log(`Testnet: ${bingxConn.is_testnet === "1" || bingxConn.is_testnet === true}\n`)
+    console.log(`Testnet: ${String(bingxConn.is_testnet) === "1" || bingxConn.is_testnet === true}\n`)
 
     service = new BingXMarketDataService({
       exchange: "bingx",
       apiType: bingxConn.api_type || "perpetual_futures",
-      isTestnet: bingxConn.is_testnet === "1" || bingxConn.is_testnet === true,
+      isTestnet: String(bingxConn.is_testnet) === "1" || bingxConn.is_testnet === true,
       apiKey: bingxConn.api_key,
       apiSecret: bingxConn.api_secret,
     })
