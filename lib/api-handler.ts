@@ -21,17 +21,30 @@ export interface HandlerContext {
 export async function withErrorHandling<T extends any[], R extends NextResponse | Response>(
   handler: (...args: T) => Promise<R>,
   context: HandlerContext,
-): Promise<(...args: T) => Promise<NextResponse>> {
-  return async (...args: T): Promise<NextResponse> => {
+): Promise<(...args: T) => Promise<R>> {
+  return async (...args: T): Promise<R> => {
     const startTime = Date.now()
     const { endpoint, method, operation = endpoint, userId } = context
 
     try {
       const result = await handler(...args)
       
-      // Log successful request (verbose)
+      // Log successful request
       const duration = Date.now() - startTime
       console.log(`[v0] API: ${method} ${endpoint} - ${result.status} (${duration}ms)`)
+
+      // ✅ Persist successful API requests to database
+      try {
+        await SystemLogger.logAPI(`${method} ${endpoint}`, "info", endpoint, {
+          method,
+          statusCode: result.status,
+          duration,
+          userId,
+          operation
+        })
+      } catch (logErr) {
+        console.error("[v0] Failed to log successful request:", logErr)
+      }
 
       return result
     } catch (error) {
@@ -46,7 +59,9 @@ export async function withErrorHandling<T extends any[], R extends NextResponse 
       // Handle ApiError instances
       if (error instanceof ApiError) {
         try {
-          await SystemLogger.logError(error, userId || "system", operation, {
+          await SystemLogger.logError("api", error, {
+            userId: userId || "system",
+            operation,
             endpoint,
             method,
             statusCode: error.statusCode,
@@ -68,7 +83,9 @@ export async function withErrorHandling<T extends any[], R extends NextResponse 
       // Handle regular Error instances
       if (error instanceof Error) {
         try {
-          await SystemLogger.logError(error, userId || "system", operation, {
+          await SystemLogger.logError("api", error, {
+            userId: userId || "system",
+            operation,
             endpoint,
             method,
             stack: error.stack,
@@ -90,11 +107,13 @@ export async function withErrorHandling<T extends any[], R extends NextResponse 
       // Handle unknown error types
       const unknownError = new Error(String(error))
       try {
-        await SystemLogger.logError(unknownError, userId || "system", operation, {
-          endpoint,
-          method,
-          originalError: String(error),
-        })
+          await SystemLogger.logError("api", unknownError, {
+            userId: userId || "system",
+            operation,
+            endpoint,
+            method,
+            originalError: String(error),
+          })
       } catch (logErr) {
         console.error("[v0] Failed to log unknown error:", logErr)
       }
