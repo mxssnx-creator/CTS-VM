@@ -77,17 +77,21 @@ export class BasePseudoPositionManager {
         lastPartRatio,
       })
 
-      // ENFORCE: Max 1 pseudo position per direction per (indication + strategy config) combination
-      const existingPerDirection = basePositions.find((p: any) =>
+      // ENFORCE: Max 1 pseudo position PER UNIQUE SET (config combination) per direction
+      // Allow multiple different config combinations for same direction, but each config set gets exactly 1 position
+      const existingForThisConfigAndDirection = basePositions.find((p: any) =>
         p.symbol === symbol &&
         p.indication_type === indicationType &&
         p.indication_range === range &&
-        p.direction === direction
+        p.direction === direction &&
+        p.tpFactor === tpFactor &&
+        p.slRatio === slRatio &&
+        p.trailingEnabled === trailingEnabled
       )
 
-      if (existingPerDirection) {
-        console.log(`[v0] Already have base position for ${symbol} ${indicationType} range=${range} direction=${direction}: ${existingPerDirection.id}`)
-        return existingPerDirection.id
+      if (existingForThisConfigAndDirection) {
+        console.log(`[v0] Already have base position for ${symbol} ${indicationType} range=${range} direction=${direction} config (TP=${tpFactor} SL=${slRatio} Trailing=${trailingEnabled}): ${existingForThisConfigAndDirection.id}`)
+        return existingForThisConfigAndDirection.id
       }
 
       const existing = basePositions.find((p: any) => p.config_key === configKey)
