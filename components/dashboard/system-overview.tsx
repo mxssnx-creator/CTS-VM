@@ -98,7 +98,7 @@ export function SystemOverview() {
               totalKeys: 1247,
             },
             exchangeConnections: {
-              total: 11,
+              total: 4,
               enabled: 4,
               working: 1,
               status: "partial",
@@ -339,18 +339,22 @@ export function SystemOverview() {
                  <span className="text-muted-foreground">Created</span>
                  <span className="font-semibold">{stats.exchangeConnections.total}</span>
                </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground" title="Connections with enabled status">Enabled</span>
-                <span className={`font-semibold ${stats.exchangeConnections.enabled > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                  {stats.exchangeConnections.enabled}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground" title="Connections where API test passed">Working</span>
-                <span className={`font-semibold ${stats.exchangeConnections.working > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
-                  {stats.exchangeConnections.working}
-                </span>
-              </div>
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-muted-foreground" title="Connections with enabled status">Enabled</span>
+                 <span className={`font-semibold ${stats.exchangeConnections.enabled > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                   {stats.exchangeConnections.enabled}
+                 </span>
+               </div>
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-muted-foreground" title="Connections where API test passed">Working</span>
+                 <span className={`font-semibold ${stats.exchangeConnections.working > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
+                   {stats.exchangeConnections.working}
+                 </span>
+               </div>
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-muted-foreground" title="All system predefined templates">Predefined</span>
+                 <span className="font-semibold text-muted-foreground">11</span>
+               </div>
               <div className="pt-1 border-t mt-2">
                 <Badge className={`text-[10px] h-5 w-full justify-center ${getStatusColor(stats.exchangeConnections.status)}`}>
                   {stats.exchangeConnections.status}
