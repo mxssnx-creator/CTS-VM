@@ -328,17 +328,17 @@ export function SystemOverview() {
             </div>
           </div>
 
-          {/* Exchange Connections */}
-          <div className={`p-3 rounded-lg border-l-4 ${getBorderColor(stats.exchangeConnections.status)} bg-muted/30`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Network className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground">Exchange Connections</span>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Base</span>
-                <span className="font-semibold">{stats.exchangeConnections.total}</span>
-              </div>
+           {/* Exchange Connections */}
+           <div className={`p-3 rounded-lg border-l-4 ${getBorderColor(stats.exchangeConnections.status)} bg-muted/30`}>
+             <div className="flex items-center gap-2 mb-2">
+               <Network className="h-4 w-4 text-muted-foreground" />
+               <span className="text-xs font-semibold text-muted-foreground">Exchange Connections</span>
+             </div>
+             <div className="space-y-1.5">
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-muted-foreground">Created</span>
+                 <span className="font-semibold">{stats.exchangeConnections.total}</span>
+               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground" title="Connections with enabled status">Enabled</span>
                 <span className={`font-semibold ${stats.exchangeConnections.enabled > 0 ? "text-green-600" : "text-muted-foreground"}`}>
@@ -359,17 +359,17 @@ export function SystemOverview() {
             </div>
           </div>
 
-          {/* Active Connections */}
-          <div className={`p-3 rounded-lg border-l-4 ${stats.activeConnections.active > 0 ? "border-l-green-500" : stats.activeConnections.total > 0 ? "border-l-blue-400" : "border-l-gray-400"} bg-muted/30`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground">Active Connections</span>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground" title="Connections established in the Active panel">Established</span>
-                <span className="font-semibold">{stats.activeConnections.total}</span>
-              </div>
+           {/* Main Connections */}
+           <div className={`p-3 rounded-lg border-l-4 ${stats.activeConnections.active > 0 ? "border-l-green-500" : stats.activeConnections.total > 0 ? "border-l-blue-400" : "border-l-gray-400"} bg-muted/30`}>
+             <div className="flex items-center gap-2 mb-2">
+               <Activity className="h-4 w-4 text-muted-foreground" />
+               <span className="text-xs font-semibold text-muted-foreground">Main Connections</span>
+             </div>
+             <div className="space-y-1.5">
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-muted-foreground" title="Connections assigned in the main panel">Assigned</span>
+                 <span className="font-semibold">{stats.activeConnections.total}</span>
+               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground" title="Enabled via the Enable toggle">Enabled</span>
                 <span className={`font-semibold ${stats.activeConnections.active > 0 ? "text-green-600" : "text-muted-foreground"}`}>
