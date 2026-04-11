@@ -9,6 +9,14 @@ import {
   TrendingUp, Target, Zap, CircleDollarSign, RefreshCw
 } from "lucide-react"
 
+interface PrehistoricMetrics {
+  dataLoaded: number
+  cyclesCompleted: number
+  symbolsProcessed: number
+  isActive: boolean
+  progress: number
+}
+
 interface ProcessingMetrics {
   symbolsProcessed: number
   totalDataSizeMB: number
@@ -53,6 +61,7 @@ interface PositionMetrics {
 }
 
 interface FunctionalOverviewData {
+  prehistoric: PrehistoricMetrics
   processing: ProcessingMetrics
   indications: IndicationMetrics
   strategies: StrategyMetrics
@@ -61,6 +70,13 @@ interface FunctionalOverviewData {
 }
 
 const initialData: FunctionalOverviewData = {
+  prehistoric: {
+    dataLoaded: 0,
+    cyclesCompleted: 0,
+    symbolsProcessed: 0,
+    isActive: false,
+    progress: 0
+  },
   processing: {
     symbolsProcessed: 0,
     totalDataSizeMB: 0,
@@ -157,6 +173,34 @@ export function FunctionalOverview() {
             <span>Auto-refresh 5s</span>
             <span>•</span>
             <span>Last update: {lastUpdateTime.toLocaleTimeString()}</span>
+          </div>
+        </div>
+
+        {/* Prehistoric Phase */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Prehistoric Phase</h3>
+            {data.prehistoric.isActive && <Badge className="text-[10px]">Active</Badge>}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{formatNumber(data.prehistoric.symbolsProcessed)}</div>
+              <div className="text-[10px] text-muted-foreground">Symbols Processed</div>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{formatNumber(data.prehistoric.cyclesCompleted)}</div>
+              <div className="text-[10px] text-muted-foreground">Cycles Completed</div>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{formatMB(data.prehistoric.dataLoaded)}</div>
+              <div className="text-[10px] text-muted-foreground">Data Loaded</div>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{data.prehistoric.progress.toFixed(1)}%</div>
+              <div className="text-[10px] text-muted-foreground">Progress</div>
+              <Progress value={data.prehistoric.progress} className="h-1 mt-1" />
+            </div>
           </div>
         </div>
 
