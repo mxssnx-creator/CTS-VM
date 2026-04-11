@@ -46,10 +46,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const isEngineRunning = runningFlag === "true" || runningFlag === true
     
     // Check if this connection is currently active/dashboard enabled
-    const isActive = connection?.is_main_enabled === "1" || connection?.is_main_enabled === true
-    const isEnabled = connection?.is_enabled === "1" || connection?.is_enabled === true
-    const isInserted = connection?.is_assigned === "1" || connection?.is_assigned === true
-    const isActiveInserted = connection?.is_active_assigned === "1" || connection?.is_active_assigned === true
+    const isActive = String(connection?.is_main_enabled) === "1" || connection?.is_main_enabled === true
+    const isEnabled = String(connection?.is_enabled) === "1" || connection?.is_enabled === true
+    const isInserted = String(connection?.is_assigned) === "1" || connection?.is_assigned === true
+    const isActiveInserted = String(connection?.is_active_assigned) === "1" || connection?.is_active_assigned === true
     
     // Get progression state (cycles, success rates)
     const progressionState = await ProgressionStateManager.getProgressionState(connectionId)
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         startedAt: globalState?.started_at || engineState?.started_at || null,
         updatedAt: progression?.updated_at || engineState?.last_indication_run || new Date().toISOString(),
         details: {
-          historicalDataLoaded: currentIdx >= 3 || progressionState.prehistoricCyclesCompleted > 0,
+          historicalDataLoaded: currentIdx >= 3 || (progressionState.prehistoricCyclesCompleted || 0) > 0,
           indicationsCalculated: currentIdx >= 4 || engineRunning || indicationsCount > 0,
           strategiesProcessed: currentIdx >= 5 || engineRunning || strategiesCount > 0,
           liveProcessingActive: currentIdx >= 5 || engineRunning,
