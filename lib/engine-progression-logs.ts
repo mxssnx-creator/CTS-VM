@@ -8,6 +8,7 @@
  */
 
 import { getRedisClient } from "@/lib/redis-db"
+import { getUniqueEngineRelation } from "@/lib/engine-unique-relations"
 
 export interface ProgressionLogEntry {
   timestamp: string

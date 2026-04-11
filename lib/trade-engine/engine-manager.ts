@@ -14,6 +14,7 @@ import { loadMarketDataForEngine, loadPrehistoricMarketData } from "@/lib/market
 import { ProgressionStateManager } from "@/lib/progression-state-manager"
 import { createExchangeConnector } from "@/lib/exchange-connectors"
 import { BingXMarketDataService } from "@/lib/bingx-market-data"
+import { getUniqueEngineRelation, updateRelationState, getLogPrefix, dispatchRelationUpdate, getEngineStateKey, getEngineProgressionKey, getEngineRunningFlagKey } from "@/lib/engine-unique-relations"
 
 export interface EngineConfig {
   connectionId: string
@@ -31,6 +32,7 @@ export interface ComponentHealth {
 
 export class TradeEngineManager {
   private connectionId: string
+  private relation: ReturnType<typeof getUniqueEngineRelation>
   private isRunning = false
   private indicationTimer?: NodeJS.Timeout
   private strategyTimer?: NodeJS.Timeout
@@ -52,6 +54,10 @@ export class TradeEngineManager {
 
   constructor(config: EngineConfig) {
     this.connectionId = config.connectionId
+    
+    // Initialize unique relation - this guarantees consistent identifiers
+    this.relation = getUniqueEngineRelation(config.connectionId)
+    
     this.indicationProcessor = new IndicationProcessor(config.connectionId)
     this.strategyProcessor = new StrategyProcessor(config.connectionId)
     this.pseudoPositionManager = new PseudoPositionManager(config.connectionId)
@@ -63,7 +69,7 @@ export class TradeEngineManager {
       realtime: { status: "healthy", lastCycleDuration: 0, errorCount: 0, successRate: 100 },
     }
 
-    console.log("[v0] TradeEngineManager initialized (timer-based async processor)")
+    console.log(`${this.relation.loggingContext} TradeEngineManager initialized (timer-based async processor)`)
   }
 
   /**
