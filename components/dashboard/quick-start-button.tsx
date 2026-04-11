@@ -247,41 +247,51 @@ if (typeof window !== "undefined") {
           ))}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            onClick={handleQuickStart}
-            disabled={isRunning}
-            className="flex-1 gap-2"
-            variant="default"
-          >
-            {isRunning ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Running Quick Start...
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4" />
-                Start Quick Setup
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={() => {
-              setSteps(steps.map(s => ({ ...s, status: "pending", message: undefined })))
-              setIsRunning(false)
-            }}
-            disabled={isRunning}
-            variant="outline"
-            size="icon"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-          
-          {/* Detailed Logs Button */}
-          <DetailedLoggingDialog />
-        </div>
+         {/* Top Buttons: Overview / Logs */}
+         <div className="flex justify-center gap-3 mb-4">
+           <Button variant="default" size="sm" className="gap-1.5">
+             Overview
+           </Button>
+           <Button variant="outline" size="sm" className="gap-1.5">
+             Log
+           </Button>
+         </div>
+
+         {/* Action Buttons */}
+         <div className="flex gap-2 pt-2">
+           <Button
+             onClick={handleQuickStart}
+             disabled={isRunning}
+             className="flex-1 gap-2"
+             variant="default"
+           >
+             {isRunning ? (
+               <>
+                 <Loader2 className="w-4 h-4 animate-spin" />
+                 Running Quick Start...
+               </>
+             ) : (
+               <>
+                 <Zap className="w-4 h-4" />
+                 Start Quick Setup
+               </>
+             )}
+           </Button>
+           <Button
+             onClick={() => {
+               setSteps(steps.map(s => ({ ...s, status: "pending", message: undefined })))
+               setIsRunning(false)
+             }}
+             disabled={isRunning}
+             variant="outline"
+             size="icon"
+           >
+             <RefreshCw className="w-4 h-4" />
+           </Button>
+           
+           {/* Detailed Logs Button */}
+           <DetailedLoggingDialog />
+         </div>
 
         {/* Dev Mode Test Button */}
         <ComprehensiveDevModeDialog />

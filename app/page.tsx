@@ -8,7 +8,6 @@ import { useState, useEffect } from "react"
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"overview" | "logs">("overview")
 
   useEffect(() => {
     try {
@@ -55,30 +54,7 @@ export default function HomePage() {
   return (
     <AuthGuard>
       <div className="flex flex-col h-screen">
-        <PageHeader title={activeTab === "overview" ? "Overview" : "System Logs"} description={activeTab === "overview" ? "Complete trading system overview" : "Detailed smart system logs"}>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "overview"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab("logs")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "logs"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              Logs
-            </button>
-          </div>
-        </PageHeader>
+        <PageHeader title="Dashboard" description="Complete trading system monitoring and controls" />
         <div className="flex-1 overflow-auto">
           {error ? (
             <div className="p-6">
@@ -87,13 +63,9 @@ export default function HomePage() {
                 <p className="text-sm text-red-600 mt-1">{error}</p>
               </div>
             </div>
-          ) : activeTab === "overview" ? (
-            <ErrorBoundaryWrapper>
-              <Dashboard />
-            </ErrorBoundaryWrapper>
           ) : (
             <ErrorBoundaryWrapper>
-              <SmartLoggingDashboard />
+              <Dashboard />
             </ErrorBoundaryWrapper>
           )}
         </div>
