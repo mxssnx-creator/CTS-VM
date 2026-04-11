@@ -3,17 +3,18 @@ import { SignJWT, jwtVerify } from "jose"
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
 
-if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable must be set in production!")
+function getJwtSecret(): Uint8Array {
+  if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+    throw new Error("FATAL: JWT_SECRET environment variable must be set in production!")
+  }
+
+  if (!process.env.JWT_SECRET) {
+    console.warn("WARNING: JWT_SECRET not set, using auto-generated development secret for development only!")
+  }
+
+  const JWT_SECRET_VALUE = process.env.JWT_SECRET || "development-secret-do-not-use-in-production-12345"
+  return new TextEncoder().encode(JWT_SECRET_VALUE)
 }
-
-if (!process.env.JWT_SECRET) {
-  console.warn("WARNING: JWT_SECRET not set, using auto-generated development secret for development only!")
-}
-
-const JWT_SECRET_VALUE = process.env.JWT_SECRET || "development-secret-do-not-use-in-production-12345"
-
-const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_VALUE)
 
 export interface User {
   id: number
@@ -40,12 +41,12 @@ export async function createToken(user: User): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(JWT_SECRET)
+    .sign(getJwtSecret())
 }
 
 export async function verifyToken(token: string): Promise<User | null> {
   try {
-    const verified = await jwtVerify(token, JWT_SECRET)
+    const verified = await jwtVerify(token, getJwtSecret())
     return verified.payload as unknown as User
   } catch (error) {
     return null
