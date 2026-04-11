@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, ReactNode } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useExchange } from "@/lib/exchange-context"
-import { DashboardStateProvider, useDashboardState } from "@/contexts/dashboard-state-context"
+import { DashboardStateProvider, useDashboardState } from "./dashboard-state-context"
 import { SystemOverview } from "./system-overview"
 import { FunctionalOverview } from "./functional-overview"
 import { GlobalTradeEngineControls } from "./global-trade-engine-controls"
@@ -96,7 +96,7 @@ function DashboardContent({ selectedExchange }: { selectedExchange: string | nul
           <h1 className="text-3xl font-bold mb-1">CTS v3.2 Dashboard</h1>
           <p className="text-muted-foreground text-sm">Monitor and control your active trading connections</p>
         </div>
-        <Button onClick={loadExchangeConnectionsActive} size="sm" variant="outline">
+        <Button onClick={refresh} size="sm" variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -122,12 +122,12 @@ function DashboardContent({ selectedExchange }: { selectedExchange: string | nul
         <DashboardActiveConnectionsManager />
       </ErrorBoundary>
 
-      {/* Intervals & Strategies Overview */}
-      {filteredConnections.length > 0 && (
-        <ErrorBoundary name="Intervals & Strategies">
-          <IntervalsStrategiesOverview connections={filteredConnections} />
-        </ErrorBoundary>
-      )}
+       {/* Intervals & Strategies Overview */}
+       {filteredConnections.map((conn: any) => (
+         <ErrorBoundary key={conn.connectionId} name="Intervals & Strategies">
+           <IntervalsStrategiesOverview connectionId={conn.connectionId} />
+         </ErrorBoundary>
+       ))}
 
       {/* Statistics Overview V2 - Unified widget with all metrics */}
       {filteredConnections.length > 0 && (
