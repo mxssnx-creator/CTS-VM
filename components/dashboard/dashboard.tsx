@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, ReactNode } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useExchange } from "@/lib/exchange-context"
-import { useConnectionState } from "@/lib/connection-state"
+import { DashboardStateProvider, useDashboardState } from "@/contexts/dashboard-state-context"
 import { SystemOverview } from "./system-overview"
 import { FunctionalOverview } from "./functional-overview"
 import { GlobalTradeEngineControls } from "./global-trade-engine-controls"
@@ -60,88 +60,33 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 export function Dashboard() {
   const { user } = useAuth()
   const { selectedExchange } = useExchange()
+
+  return (
+    <DashboardStateProvider>
+      <DashboardContent selectedExchange={selectedExchange} />
+    </DashboardStateProvider>
+  )
+}
+
+function DashboardContent({ selectedExchange }: { selectedExchange: string | null }) {
   const { 
-    exchangeConnectionsActive, 
-    loadExchangeConnectionsActive, 
-    isExchangeConnectionsActiveLoading,
-  } = useConnectionState()
-  const [stats, setStats] = useState({
-    activeConnections: 0,
-    totalPositions: 0,
-    dailyPnL: 0,
-    totalBalance: 0,
-    indicationsActive: 0,
-    strategiesActive: 0,
-    systemLoad: 45,
-    databaseSize: 128,
-  })
+    isLoading, 
+    activeConnections,
+    statistics,
+    refresh
+  } = useDashboardState()
 
   // Filter ExchangeConnectionsActive by selected exchange
   const filteredConnections = useMemo(() => {
     if (!selectedExchange) {
-      return exchangeConnectionsActive
+      return activeConnections
     }
-    return exchangeConnectionsActive.filter(conn => conn.exchange === selectedExchange)
-  }, [exchangeConnectionsActive, selectedExchange])
+    return activeConnections.filter((conn: any) => conn.exchange === selectedExchange)
+  }, [activeConnections, selectedExchange])
 
   useEffect(() => {
     console.log("[v0] [Dashboard] Mounted")
-    // Don't await these - let them load in background
-    // This ensures the dashboard renders immediately
-    loadExchangeConnectionsActive().catch(err => {
-      console.warn("[v0] [Dashboard] Failed to load connections:", err)
-    })
-    loadStats()
-    
-    const interval = setInterval(() => {
-      loadStats()
-    }, 5000)
-    
-    return () => clearInterval(interval)
   }, [])
-
-  // Reload stats when selected exchange changes
-  useEffect(() => {
-    console.log("[v0] [Dashboard] Exchange changed to:", selectedExchange)
-    loadStats()
-  }, [selectedExchange])
-
-  const loadStats = async () => {
-    try {
-      // Fetch both monitoring stats and system monitoring data
-      const url = selectedExchange 
-        ? `/api/monitoring/stats?exchange=${selectedExchange}`
-        : "/api/monitoring/stats"
-      
-      const [statsRes, sysMonRes] = await Promise.all([
-        fetch(url),
-        fetch("/api/system/monitoring"),
-      ])
-      
-      let data = { activeConnections: 0, totalPositions: 0, dailyPnL: 0, totalBalance: 0 }
-      let sysData = { cpu: 0, database: { keys: 0 }, engines: { indications: { resultsCount: 0 }, strategies: { resultsCount: 0 } } }
-      
-      if (statsRes.ok) {
-        data = await statsRes.json()
-      }
-      if (sysMonRes.ok) {
-        sysData = await sysMonRes.json()
-      }
-      
-      setStats({
-        activeConnections: data.activeConnections ?? 0,
-        totalPositions: data.totalPositions ?? 0,
-        dailyPnL: data.dailyPnL ?? 0,
-        totalBalance: data.totalBalance ?? 0,
-        indicationsActive: sysData.engines?.indications?.resultsCount ?? 0,
-        strategiesActive: sysData.engines?.strategies?.resultsCount ?? 0,
-        systemLoad: sysData.cpu ?? 0,
-        databaseSize: sysData.database?.keys ?? 0,
-      })
-    } catch (error) {
-      console.error("Failed to load stats:", error)
-    }
-  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
