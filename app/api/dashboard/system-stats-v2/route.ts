@@ -33,8 +33,8 @@ export async function GET() {
     let liveTradeCount = 0
     let presetTradeCount = 0
     for (const conn of activeConnections) {
-      if (conn.live_trade_enabled === true || conn.live_trade_enabled === "1" || conn.is_live_trade === true || conn.is_live_trade === "1") liveTradeCount++
-      if (conn.preset_trade_enabled === true || conn.preset_trade_enabled === "1" || conn.is_preset_trade === true || conn.is_preset_trade === "1") presetTradeCount++
+      if (String((conn as any).live_trade_enabled) === "1" || (conn as any).live_trade_enabled === true || String(conn.is_live_trade) === "1" || conn.is_live_trade === true) liveTradeCount++
+      if (String((conn as any).preset_trade_enabled) === "1" || (conn as any).preset_trade_enabled === true || String(conn.is_preset_trade) === "1" || conn.is_preset_trade === true) presetTradeCount++
     }
 
     const engineHash = await client.hgetall("trade_engine:global") || {}

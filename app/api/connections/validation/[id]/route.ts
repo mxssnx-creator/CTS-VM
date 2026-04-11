@@ -21,10 +21,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: connectionId,
       name: connection.name,
       exchange: connection.exchange,
-      enabled: connection.is_enabled === "1" || connection.is_enabled === true,
-      dashboard_inserted: connection.is_main_assigned === "1" || connection.is_main_assigned === true,
-      dashboard_enabled: connection.is_main_enabled === "1" || connection.is_main_enabled === true,
-      live_trade: connection.is_live_trade === "1" || connection.is_live_trade === true,
+      enabled: String(connection.is_enabled) === "1" || connection.is_enabled === true,
+      dashboard_inserted: String(connection.is_main_assigned) === "1" || connection.is_main_assigned === true,
+      dashboard_enabled: String(connection.is_main_enabled) === "1" || connection.is_main_enabled === true,
+      live_trade: String(connection.is_live_trade) === "1" || connection.is_live_trade === true,
     }
 
     console.log(`[v0] [IndicationValidation] Connection state: ${JSON.stringify(connectionValid)}`)
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   } catch (error) {
     console.error(`[v0] [IndicationValidation] Error:`, error)
-    await SystemLogger.logError(error, "api", "GET /api/connections/validation/[id]")
+    await SystemLogger.logError(String(error), "api", "GET /api/connections/validation/[id]")
     
     return NextResponse.json(
       {

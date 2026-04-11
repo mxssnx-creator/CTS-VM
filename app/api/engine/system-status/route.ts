@@ -41,7 +41,7 @@ export async function GET() {
         totalEvaluated: engineState.total_strategies_evaluated || 0,
         status: engineState.strategy_cycle_count > 0 ? "running" : "idle",
       },
-      recommendation: this.getRecommendation(activeConnections, engineState),
+      recommendation: getRecommendation(activeConnections, engineState),
     }
 
     await logProgressionEvent(connectionId, "system_status_check", "info", "System status report generated", status)
