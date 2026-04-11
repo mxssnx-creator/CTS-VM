@@ -190,29 +190,7 @@ export function SystemOverview() {
           setStats(prev => ({ ...prev, ...data }))
         }
       } catch (error) {
-        setStats({
-          tradeEngines: {
-            globalStatus: "running",
-            mainStatus: "running",
-            mainCount: 2,
-            mainTotal: 1,
-            presetStatus: "idle",
-            presetCount: 0,
-            presetTotal: 0,
-            totalEnabled: 1,
-          },
-          database: { status: "healthy", requestsPerSecond: 47, totalKeys: 12747 },
-          exchangeConnections: { total: 4, enabled: 4, working: 1, status: "partial" },
-          activeConnections: { total: 1, active: 1, liveTrade: 1, presetTrade: 0 },
-          liveTrades: { lastHour: 127, topConnections: [{ name: "BingX", count: 127 }] },
-          indications: { total: 18, active: 12, types: { RSI: 5, MACD: 4, EMA: 3, VWAP: 3, Volume: 3 }, last5min: 142, last60min: 1187 },
-          strategies: {
-            base: { totalSets: 742, evaluatedSets: 621, avgPositions: 8.3, avgProfitFactor: 1.42, avgProcessingTime: 12, last5min: 892, last60min: 7241 },
-            main: { totalSets: 418, evaluatedSets: 387, percentageOfBase: 62.3, avgPositions: 4.7, avgProfitFactor: 1.78, avgProcessingTime: 28, last5min: 417, last60min: 3289 },
-            real: { totalSets: 126, evaluatedSets: 119, percentageOfMain: 30.8, avgPositions: 2.1, avgProfitFactor: 2.14, avgProcessingTime: 62, last5min: 87, last60min: 692 },
-          },
-          prehistoric: { processed: 89241, remaining: 12747, progress: 87.5, eta: "12m" },
-        })
+        console.error("[v0] Failed to load system stats:", error)
       }
     }
 

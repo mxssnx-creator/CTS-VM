@@ -47,6 +47,25 @@ export async function GET() {
       workingBase.length === 0 ? "partial" :
       workingBase.length < baseConnections.length / 2 ? "partial" : "healthy"
 
+    // Get real live tracking data
+    const strategiesBase = await client.hgetall("strategies:base") || {}
+    const strategiesMain = await client.hgetall("strategies:main") || {}
+    const strategiesReal = await client.hgetall("strategies:real") || {}
+    const indicationsStats = await client.hgetall("indications:stats") || {}
+    const prehistoricStats = await client.hgetall("prehistoric:status") || {}
+    const liveTradesStats = await client.hgetall("trades:stats") || {}
+
+    // Calculate real live values
+    const totalKeys = await client.dbSize()
+    const lastHourTrades = parseInt(liveTradesStats.last_hour || "0")
+    
+    const baseEvaluated = parseInt(strategiesBase.evaluated_sets || "0")
+    const baseTotal = parseInt(strategiesBase.total_sets || "0")
+    const mainEvaluated = parseInt(strategiesMain.evaluated_sets || "0")
+    const mainTotal = parseInt(strategiesMain.total_sets || "0")
+    const realEvaluated = parseInt(strategiesReal.evaluated_sets || "0")
+    const realTotal = parseInt(strategiesReal.total_sets || "0")
+
     return NextResponse.json({
       success: true,
       tradeEngines: {
@@ -62,6 +81,7 @@ export async function GET() {
       database: {
         status: "healthy",
         requestsPerSecond: getRedisRequestsPerSecond(),
+        totalKeys,
       },
       exchangeConnections: {
         total: baseConnections.length,
@@ -76,8 +96,60 @@ export async function GET() {
         presetTrade: presetTradeCount,
       },
       liveTrades: {
-        lastHour: 0,
-        topConnections: [],
+        lastHour: lastHourTrades,
+        topConnections: Object.entries(liveTradesStats)
+          .filter(([k]) => k.startsWith("conn_"))
+          .map(([k, v]) => ({ name: k.replace("conn_", ""), count: parseInt(v) }))
+          .sort((a,b) => b.count - a.count)
+          .slice(0, 3),
+      },
+      indications: {
+        total: parseInt(indicationsStats.total || "0"),
+        active: parseInt(indicationsStats.active || "0"),
+        types: Object.fromEntries(
+          Object.entries(indicationsStats)
+            .filter(([k]) => k.startsWith("type_"))
+            .map(([k, v]) => [k.replace("type_", ""), parseInt(v)])
+        ),
+        last5min: parseInt(indicationsStats.last_5min || "0"),
+        last60min: parseInt(indicationsStats.last_60min || "0"),
+      },
+      strategies: {
+        base: {
+          totalSets: baseTotal,
+          evaluatedSets: baseEvaluated,
+          avgPositions: parseFloat(strategiesBase.avg_positions || "0"),
+          avgProfitFactor: parseFloat(strategiesBase.avg_profit_factor || "0"),
+          avgProcessingTime: parseInt(strategiesBase.avg_processing_time || "0"),
+          last5min: parseInt(strategiesBase.last_5min || "0"),
+          last60min: parseInt(strategiesBase.last_60min || "0"),
+        },
+        main: {
+          totalSets: mainTotal,
+          evaluatedSets: mainEvaluated,
+          percentageOfBase: baseTotal > 0 ? (mainTotal / baseTotal * 100) : 0,
+          avgPositions: parseFloat(strategiesMain.avg_positions || "0"),
+          avgProfitFactor: parseFloat(strategiesMain.avg_profit_factor || "0"),
+          avgProcessingTime: parseInt(strategiesMain.avg_processing_time || "0"),
+          last5min: parseInt(strategiesMain.last_5min || "0"),
+          last60min: parseInt(strategiesMain.last_60min || "0"),
+        },
+        real: {
+          totalSets: realTotal,
+          evaluatedSets: realEvaluated,
+          percentageOfMain: mainTotal > 0 ? (realTotal / mainTotal * 100) : 0,
+          avgPositions: parseFloat(strategiesReal.avg_positions || "0"),
+          avgProfitFactor: parseFloat(strategiesReal.avg_profit_factor || "0"),
+          avgProcessingTime: parseInt(strategiesReal.avg_processing_time || "0"),
+          last5min: parseInt(strategiesReal.last_5min || "0"),
+          last60min: parseInt(strategiesReal.last_60min || "0"),
+        },
+      },
+      prehistoric: {
+        processed: parseInt(prehistoricStats.processed || "0"),
+        remaining: parseInt(prehistoricStats.remaining || "0"),
+        progress: parseFloat(prehistoricStats.progress || "0"),
+        eta: prehistoricStats.eta || "0m",
       },
     })
   } catch (error) {
