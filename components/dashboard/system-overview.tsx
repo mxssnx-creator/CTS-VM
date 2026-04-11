@@ -351,10 +351,6 @@ export function SystemOverview() {
                    {stats.exchangeConnections.working}
                  </span>
                </div>
-               <div className="flex items-center justify-between text-xs">
-                 <span className="text-muted-foreground" title="All system predefined templates">Predefined</span>
-                 <span className="font-semibold text-muted-foreground">11</span>
-               </div>
               <div className="pt-1 border-t mt-2">
                 <Badge className={`text-[10px] h-5 w-full justify-center ${getStatusColor(stats.exchangeConnections.status)}`}>
                   {stats.exchangeConnections.status}
