@@ -17,7 +17,7 @@ if (!globalStore.__cts_startup_guard) {
 }
 
 async function seedMarketData() {
-  console.log("[v0] [Seed] Starting market data seeding...")
+  console.log("[v0] [Seed] Starting market data seeding from real exchanges...")
 
   const symbols = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT",
@@ -25,56 +25,48 @@ async function seedMarketData() {
     "MATICUSDT", "SOLUSDT", "UNIUSDT", "APTUSDT", "ARBUSDT"
   ]
 
-  const basePrices: Record<string, number> = {
-    BTCUSDT: 45000,
-    ETHUSDT: 2500,
-    BNBUSDT: 400,
-    XRPUSDT: 2.5,
-    ADAUSDT: 0.95,
-    DOGEUSDT: 0.35,
-    LINKUSDT: 25,
-    LITUSDT: 120,
-    THETAUSDT: 2.5,
-    AVAXUSDT: 35,
-    MATICUSDT: 1.2,
-    SOLUSDT: 180,
-    UNIUSDT: 18,
-    APTUSDT: 8,
-    ARBUSDT: 0.9,
-  }
-
   let seededCount = 0
   let totalDataPoints = 0
   
   for (const symbol of symbols) {
     try {
-      const basePrice = basePrices[symbol] || 100
-      // Seed 20 historical data points for better backtesting
-      for (let i = 0; i < 20; i++) {
-        const variation = basePrice * 0.02
-        const price = basePrice + (Math.random() - 0.5) * variation
+      // Fetch real data from Binance public API
+      const binanceSymbol = symbol.replace("-", "")
+      const response = await fetch(
+        `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSymbol}&interval=1m&limit=20`,
+        { next: { revalidate: 0 } }
+      )
+      
+      if (!response.ok) {
+        console.warn(`[v0] [Seed] Failed to fetch ${symbol}: HTTP ${response.status}`)
+        continue
+      }
+      
+      const candles = await response.json()
+      
+      for (const candle of candles) {
         const marketData = {
           symbol,
-          exchange: "bybit",
+          exchange: "binance",
           interval: "1m",
-          price,
-          open: basePrice,
-          high: basePrice + variation,
-          low: basePrice - variation,
-          close: price,
-          volume: Math.random() * 1000000,
-          timestamp: new Date(Date.now() - (20 - i) * 60000).toISOString(),
+          price: parseFloat(candle[4]), // close price
+          open: parseFloat(candle[1]),
+          high: parseFloat(candle[2]),
+          low: parseFloat(candle[3]),
+          close: parseFloat(candle[4]),
+          volume: parseFloat(candle[5]),
+          timestamp: new Date(candle[0]).toISOString(),
         }
         await saveMarketData(symbol, marketData)
         totalDataPoints++
       }
       seededCount++
-      console.log(`[v0] [Seed] ✓ ${symbol}: 20 data points`)
+      console.log(`[v0] [Seed] ✓ ${symbol}: ${candles.length} real data points from Binance`)
     } catch (error) {
       console.warn(`[v0] [Seed] ✗ Failed to seed ${symbol}:`, error)
     }
   }
-  console.log(`[v0] [Seed] Complete: ${totalDataPoints} data points across ${seededCount}/${symbols.length} symbols`)
+  console.log(`[v0] [Seed] Complete: ${totalDataPoints} real data points across ${seededCount}/${symbols.length} symbols`)
 }
 
 async function seedPredefinedConnections() {
@@ -142,8 +134,7 @@ export async function testAllExchangeConnections() {
           apiKey: connection.api_key,
           apiSecret: connection.api_secret,
           apiType: connection.api_type || "live",
-          subType: connection.api_subtype,
-          isTestnet: connection.is_testnet === true || connection.is_testnet === "true",
+          isTestnet: String(connection.is_testnet) === "true" || connection.is_testnet === true,
         })
         
         const result = await connector.testConnection()
@@ -214,7 +205,7 @@ async function initializeDefaultActiveConnections() {
     
     // Set bybit-x03 as main connection (is_main_enabled = true)
     if (bybit) {
-      if (!bybit.is_main_enabled || bybit.is_main_enabled === "0") {
+      if (!bybit.is_main_enabled || String(bybit.is_main_enabled) === "0") {
         console.log("[v0] [Seed] Setting bybit-x03 as main connection...")
         await updateConnection("bybit-x03", {
           ...bybit,
@@ -231,7 +222,7 @@ async function initializeDefaultActiveConnections() {
     
     // Set bingx-x01 as main connection (is_main_enabled = true)
     if (bingx) {
-      if (!bingx.is_main_enabled || bingx.is_main_enabled === "0") {
+      if (!bingx.is_main_enabled || String(bingx.is_main_enabled) === "0") {
         console.log("[v0] [Seed] Setting bingx-x01 as main connection...")
         await updateConnection("bingx-x01", {
           ...bingx,

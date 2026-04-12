@@ -90,11 +90,11 @@ export async function GET() {
           if (state?.prehistoric_active) prehistoricActive = true
           prehistoricProgressPercent += state?.prehistoric_progress || 0
 
-          // Processing metrics
-          symbolsProcessed += state?.symbols_processed || state?.main_symbols_processed || realtimeKeys.length || 1
+          // Processing metrics - only use real data
+          symbolsProcessed += state?.symbols_processed || state?.main_symbols_processed || 0
           totalCycles += (state?.main_cycle_count || 0) + (state?.preset_cycle_count || 0) + (state?.real_cycle_count || 0)
-          successfulCycles += state?.successful_cycles || Math.floor(totalCycles * 0.97)
-          avgCycleDurationMs += (state?.main_avg_duration_ms || 1) + (state?.preset_avg_duration_ms || 10) + (state?.real_avg_duration_ms || 3)
+          successfulCycles += state?.successful_cycles || 0
+          avgCycleDurationMs += (state?.main_avg_duration_ms || 0) + (state?.preset_avg_duration_ms || 0) + (state?.real_avg_duration_ms || 0)
 
           // Indication metrics - use realtime data if state is missing
           if (allRealtimeIndications.length > 0) {
@@ -121,25 +121,22 @@ export async function GET() {
             evaluatedIndications += state?.evaluated_indications || 0
           }
 
-          // Strategy metrics
-          baseCreated += state?.strategies_base_created || Math.max(allRealtimeIndications.length * 1, 9)
-          baseEvaluated += state?.strategies_base_evaluated || baseCreated
-          mainCreated += state?.strategies_main_created || baseCreated * 112
-          mainEvaluated += state?.strategies_main_evaluated || mainCreated
-          realCreated += state?.strategies_real_created || mainCreated
-          realEvaluated += state?.strategies_real_evaluated || realCreated
+          // Strategy metrics - only use real data from state
+          baseCreated += state?.strategies_base_created || 0
+          baseEvaluated += state?.strategies_base_evaluated || 0
+          mainCreated += state?.strategies_main_created || 0
+          mainEvaluated += state?.strategies_main_evaluated || 0
+          realCreated += state?.strategies_real_created || 0
+          realEvaluated += state?.strategies_real_evaluated || 0
 
-          // Profit factor
-          if (state?.avg_profit_factor) {
+          // Profit factor - only use real data
+          if (state?.avg_profit_factor && state.avg_profit_factor > 0) {
             totalProfitFactor += state.avg_profit_factor
-            profitFactorCount++
-          } else {
-            totalProfitFactor += 1.12
             profitFactorCount++
           }
 
-          // Positions
-          pseudoActive += state?.pseudo_positions_active || baseCreated
+          // Positions - only use real data
+          pseudoActive += state?.pseudo_positions_active || 0
           realActive += state?.real_positions_active || 0
           exchangeLive += state?.exchange_positions_live || 0
           totalPositionsCreated += state?.total_positions_created || 0

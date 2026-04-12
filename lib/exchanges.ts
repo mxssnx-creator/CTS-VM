@@ -163,7 +163,9 @@ export class BybitAPI implements ExchangeAPI {
   }
 
   async getBalance(): Promise<number> {
-    return Math.random() * 10000
+    // Return 0 - real balance should be fetched from exchange via authenticated API
+    // This is a placeholder - use the exchange connectors in /lib/exchange-connectors/ for real data
+    return 0
   }
 
   async getPositions(): Promise<any[]> {
@@ -290,27 +292,53 @@ export class BybitAPI implements ExchangeAPI {
 
   async getOrderBook(symbol: string): Promise<any> {
     console.log(`[v0] [Bybit] [${this.activeConnectionMethod.toUpperCase()}] Fetching order book for ${symbol}`)
-    return {
-      bids: [
-        [50000, 1.5],
-        [49999, 2.0],
-      ],
-      asks: [
-        [50001, 1.2],
-        [50002, 1.8],
-      ],
+    // Fetch real order book from Bybit public API
+    try {
+      const response = await fetch(`https://api.bybit.com/v5/market/orderbook?category=linear&symbol=${symbol}&limit=5`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.retCode === 0 && data.result) {
+          return {
+            bids: data.result.b.map((b: string[]) => [parseFloat(b[0]), parseFloat(b[1])]),
+            asks: data.result.a.map((a: string[]) => [parseFloat(a[0]), parseFloat(a[1])]),
+            timestamp: data.result.ts,
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[v0] [Bybit] Failed to fetch order book:`, error)
     }
+    return { bids: [], asks: [] }
   }
 
   subscribeToTicker(symbol: string, callback: (data: any) => void): void {
     console.log(`[v0] [Bybit] [${this.activeConnectionMethod.toUpperCase()}] Subscribing to ticker for ${symbol}`)
-    const interval = setInterval(() => {
-      callback({
-        symbol,
-        price: 50000 + (Math.random() - 0.5) * 1000,
-        timestamp: Date.now(),
-      })
-    }, 1000)
+    // Use real market data from public API
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${symbol}`)
+        if (response.ok) {
+          const data = await response.json()
+          const ticker = data.result?.list?.[0]
+          if (ticker) {
+            callback({
+              symbol,
+              price: parseFloat(ticker.lastPrice),
+              change_24h: parseFloat(ticker.price24hPcnt) * 100,
+              volume_24h: parseFloat(ticker.turnover24h),
+              high_24h: parseFloat(ticker.highPrice24h),
+              low_24h: parseFloat(ticker.lowPrice24h),
+              timestamp: Date.now(),
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`[v0] [Bybit] Failed to fetch ticker:`, error)
+      }
+    }, 2000)
+    
+    // Store interval ID for cleanup
+    ;(this as any).tickerInterval = interval
   }
 }
 
@@ -444,7 +472,9 @@ export class BingXAPI implements ExchangeAPI {
   }
 
   async getBalance(): Promise<number> {
-    return Math.random() * 8000
+    // Return 0 - real balance should be fetched from exchange via authenticated API
+    // Use the exchange connectors in /lib/exchange-connectors/ for real data
+    return 0
   }
 
   async getPositions(): Promise<any[]> {
@@ -570,26 +600,52 @@ export class BingXAPI implements ExchangeAPI {
   }
 
   async getOrderBook(symbol: string): Promise<any> {
-    return {
-      bids: [
-        [50000, 1.5],
-        [49999, 2.0],
-      ],
-      asks: [
-        [50001, 1.2],
-        [50002, 1.8],
-      ],
+    // Fetch real order book from BingX public API
+    try {
+      const response = await fetch(`https://open-api.bingx.com/openApi/swap/v2/quote/depth?symbol=${symbol}&limit=5`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.code === 0 && data.data) {
+          return {
+            bids: data.data.bids.map((b: string[]) => [parseFloat(b[0]), parseFloat(b[1])]),
+            asks: data.data.asks.map((a: string[]) => [parseFloat(a[0]), parseFloat(a[1])]),
+            timestamp: data.data.timestamp,
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[v0] [BingX] Failed to fetch order book:`, error)
     }
+    return { bids: [], asks: [] }
   }
 
   subscribeToTicker(symbol: string, callback: (data: any) => void): void {
-    const interval = setInterval(() => {
-      callback({
-        symbol,
-        price: 50000 + (Math.random() - 0.5) * 1000,
-        timestamp: Date.now(),
-      })
-    }, 1200)
+    // Use real market data from BingX public API
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`https://open-api.bingx.com/openApi/swap/v2/quote/ticker?symbol=${symbol}`)
+        if (response.ok) {
+          const data = await response.json()
+          const ticker = data.data?.[0]
+          if (ticker) {
+            callback({
+              symbol,
+              price: parseFloat(ticker.lastPrice),
+              change_24h: parseFloat(ticker.priceChangePercent),
+              volume_24h: parseFloat(ticker.quoteVolume),
+              high_24h: parseFloat(ticker.highPrice),
+              low_24h: parseFloat(ticker.lowPrice),
+              timestamp: Date.now(),
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`[v0] [BingX] Failed to fetch ticker:`, error)
+      }
+    }, 2000)
+    
+    // Store interval ID for cleanup
+    ;(this as any).tickerInterval = interval
   }
 }
 
@@ -721,7 +777,8 @@ export class PionexAPI implements ExchangeAPI {
   }
 
   async getBalance(): Promise<number> {
-    return Math.random() * 12000
+    // Return 0 - real balance should be fetched from exchange via authenticated API
+    return 0
   }
 
   async getPositions(): Promise<any[]> {

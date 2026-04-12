@@ -58,7 +58,7 @@ export class MarketDataFetcher {
         this.bingxService = new BingXMarketDataService({
           exchange: "bingx",
           apiType: bingxConn.api_type || "perpetual_futures",
-          isTestnet: bingxConn.is_testnet === "1" || bingxConn.is_testnet === true,
+          isTestnet: String(bingxConn.is_testnet) === "1" || bingxConn.is_testnet === true,
           apiKey: bingxConn.api_key,
           apiSecret: bingxConn.api_secret,
         })
@@ -141,35 +141,50 @@ export class MarketDataFetcher {
         }
       }
 
-      const marketData = this.generateMarketData(0, symbol)
+      // Fallback: Fetch from Binance public API
+      const marketData = await this.fetchBinanceMarketData(symbol)
       await saveMarketData(symbol, marketData)
     } catch (error) {
-      console.warn(`[v0] Failed to fetch ${symbol}, using synthetic:`, error instanceof Error ? error.message : String(error))
-      const marketData = this.generateMarketData(0, symbol)
-      await saveMarketData(symbol, marketData)
+      console.warn(`[v0] Failed to fetch ${symbol}:`, error instanceof Error ? error.message : String(error))
+      // Return null data instead of synthetic
+      await saveMarketData(symbol, null)
     }
   }
 
-  private generateMarketData(tradingPairId: number, symbol: string): MarketDataPoint {
-    const basePrice = 50000
-    const volatility = 1000
-
-    const open = basePrice + (Math.random() - 0.5) * volatility
-    const close = open + (Math.random() - 0.5) * volatility * 0.5
-    const high = Math.max(open, close) + Math.random() * volatility * 0.2
-    const low = Math.min(open, close) - Math.random() * volatility * 0.2
-    const volume = 1000000 + Math.random() * 500000
-
-    return {
-      trading_pair_id: tradingPairId,
-      symbol,
-      timestamp: new Date(),
-      open,
-      high,
-      low,
-      close,
-      volume,
+  /**
+   * Fetch real market data from Binance public API
+   */
+  private async fetchBinanceMarketData(symbol: string): Promise<MarketDataPoint> {
+    const binanceSymbol = symbol.replace("-", "")
+    const response = await fetch(
+      `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${binanceSymbol}`,
+      { next: { revalidate: 0 } }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Binance API error: ${response.status}`)
     }
+    
+    const data = await response.json()
+    
+    return {
+      trading_pair_id: 0,
+      symbol,
+      timestamp: new Date(data.closeTime || Date.now()),
+      open: parseFloat(data.openPrice),
+      high: parseFloat(data.highPrice),
+      low: parseFloat(data.lowPrice),
+      close: parseFloat(data.lastPrice),
+      volume: parseFloat(data.volume),
+    }
+  }
+
+  /**
+   * DEPRECATED: No longer generates mock data. 
+   * Use fetchBinanceMarketData or BingX service for real data.
+   */
+  private generateMarketData(_tradingPairId: number, _symbol: string): MarketDataPoint {
+    throw new Error("Synthetic market data generation is disabled. Use real exchange APIs.")
   }
 }
 

@@ -346,54 +346,79 @@ export class TradingEngine {
     return Math.floor((Date.now() - new Date(openedAt).getTime()) / (1000 * 60))
   }
 
-  generateMockPositions(connectionId: string, count = 20): void {
-    const symbols = ["BTCUSDT", "ETHUSDT", "XRPUSDT", "BCHUSDT", "LINKUSDT"]
-    const strategies = ["Base Strategy", "Main Strategy", "Real Strategy", "Block Strategy", "DCA Strategy"]
-    const indicationTypes: ("direction" | "move" | "active")[] = ["direction", "move", "active"]
+  /**
+   * Import real positions from exchange connector
+   * This replaces the mock position generation with actual exchange data
+   */
+  async importRealPositions(
+    connectionId: string,
+    exchangePositions: Array<{
+      symbol: string
+      side: "long" | "short"
+      size: number
+      entryPrice: number
+      currentPrice: number
+      unrealizedPnl: number
+      leverage?: number
+      exchangePositionId?: string
+    }>
+  ): Promise<TradingPosition[]> {
+    const importedPositions: TradingPosition[] = []
 
-    for (let i = 0; i < count; i++) {
-      const symbol = symbols[Math.floor(Math.random() * symbols.length)]
-      const strategy = strategies[Math.floor(Math.random() * strategies.length)]
-      const entryPrice = 45000 + Math.random() * 10000
-      const currentPrice = entryPrice + (Math.random() - 0.5) * 2000
-      const baseVolume = 0.01 + Math.random() * 0.1
-      const volumeFactor = 1 + Math.floor(Math.random() * 4) // 1-5
-      const volumeCalc = this.calculateVolume(baseVolume, volumeFactor)
-
+    for (const pos of exchangePositions) {
+      const volumeCalc = this.calculateVolume(pos.size, 1)
+      
       const position: TradingPosition = {
         id: uuidv4(),
         connection_id: connectionId,
-        exchange_position_id: `mock_${i}`,
-        symbol,
-        strategy_type: strategy,
+        exchange_position_id: pos.exchangePositionId || `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        symbol: pos.symbol,
+        strategy_type: "exchange_imported",
         volume: volumeCalc.adjusted,
-        entry_price: entryPrice,
-        current_price: currentPrice,
-        takeprofit: entryPrice * (1 + 0.02 + Math.random() * 0.03),
-        stoploss: entryPrice * (1 - 0.01 - Math.random() * 0.02),
-        profit_loss: (currentPrice - entryPrice) * volumeCalc.adjusted,
-        status: Math.random() > 0.3 ? "open" : "closed",
-        opened_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        closed_at: Math.random() > 0.7 ? new Date().toISOString() : undefined,
-        unrealized_pnl: (currentPrice - entryPrice) * volumeCalc.adjusted,
+        entry_price: pos.entryPrice,
+        current_price: pos.currentPrice,
+        profit_loss: pos.unrealizedPnl,
+        status: "open",
+        opened_at: new Date().toISOString(),
+        unrealized_pnl: pos.unrealizedPnl,
         realized_pnl: 0,
-        margin_used: (volumeCalc.adjusted * entryPrice) / 150, // Margin based on leverage
-        fees_paid: volumeCalc.adjusted * entryPrice * 0.001,
-        hold_time: Math.floor(Math.random() * 1440), // 0-24 hours in minutes
-        max_profit: Math.max(0, (currentPrice - entryPrice) * volumeCalc.adjusted),
-        max_loss: Math.min(0, (currentPrice - entryPrice) * volumeCalc.adjusted),
-        position_side: Math.random() > 0.5 ? "long" : "short",
+        margin_used: (volumeCalc.adjusted * pos.entryPrice) / (pos.leverage || 150),
+        fees_paid: volumeCalc.adjusted * pos.entryPrice * 0.001,
+        hold_time: 0,
+        max_profit: Math.max(0, pos.unrealizedPnl),
+        max_loss: Math.min(0, pos.unrealizedPnl),
+        position_side: pos.side,
         contract_type: "usdt-perpetual",
-        leverage: 150,
+        leverage: pos.leverage || 150,
         volume_factor: volumeCalc.factor,
         base_volume: volumeCalc.base,
         adjusted_volume: volumeCalc.adjusted,
-        indication_type: indicationTypes[Math.floor(Math.random() * indicationTypes.length)],
+        indication_type: "direction",
       }
 
       this.positions.set(position.id, position)
+      importedPositions.push(position)
     }
 
-    this.connectionBalances.set(connectionId, 10000)
+    console.log(`[v0] Imported ${importedPositions.length} real positions from exchange for connection ${connectionId}`)
+    return importedPositions
+  }
+
+  /**
+   * Clear all positions - used when switching from mock to real data
+   */
+  clearAllPositions(): void {
+    const count = this.positions.size
+    this.positions.clear()
+    console.log(`[v0] Cleared ${count} positions`)
+  }
+
+  /**
+   * DEPRECATED: This method no longer generates mock positions.
+   * Use importRealPositions() instead to fetch actual exchange data.
+   */
+  generateMockPositions(_connectionId: string, _count = 20): void {
+    console.warn("[v0] generateMockPositions is deprecated. Use importRealPositions() with real exchange data.")
+    // Do nothing - no more mock data
   }
 }

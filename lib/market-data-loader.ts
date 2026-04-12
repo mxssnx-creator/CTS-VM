@@ -82,39 +82,59 @@ async function getCandlesFromBingX(
   return []
 }
 
+/**
+ * DEPRECATED: Synthetic candle generation is disabled.
+ * Use getCandlesFromBingX or fetch from real exchange APIs.
+ */
 export function generateSyntheticCandles(
-  symbol: string,
-  basePrice: number,
-  candleCount: number = 100
+  _symbol: string,
+  _basePrice: number,
+  _candleCount: number = 100
 ): MarketDataCandle[] {
-  const candles: MarketDataCandle[] = []
-  const now = Date.now()
-  const candleInterval = 60000
+  console.warn("[MarketData] generateSyntheticCandles is deprecated. Use real exchange data.")
+  return []
+}
 
-  let lastClose = basePrice
-
-  for (let i = candleCount; i > 0; i--) {
-    const timestamp = now - i * candleInterval
-    const change = (Math.random() - 0.5) * lastClose * 0.01
-    const open = lastClose
-    const close = Math.max(lastClose * 0.8, lastClose + change)
-    const high = Math.max(open, close) * (1 + Math.random() * 0.005)
-    const low = Math.min(open, close) * (1 - Math.random() * 0.005)
-    const volume = Math.random() * 1000000
-
-    candles.push({
-      timestamp,
-      open,
-      high,
-      low,
-      close,
-      volume,
-    })
-
-    lastClose = close
+/**
+ * Fetch candles from Binance public API as fallback
+ */
+async function getCandlesFromBinance(
+  symbol: string,
+  interval: string,
+  count: number
+): Promise<MarketDataCandle[]> {
+  try {
+    const binanceSymbol = symbol.replace("-", "")
+    const intervalMap: Record<string, string> = {
+      "1m": "1m",
+      "5m": "5m",
+      "15m": "15m",
+      "1h": "1h",
+      "4h": "4h",
+      "1d": "1d",
+    }
+    const binanceInterval = intervalMap[interval] || "1m"
+    
+    const response = await fetch(
+      `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSymbol}&interval=${binanceInterval}&limit=${count}`,
+      { next: { revalidate: 0 } }
+    )
+    
+    if (!response.ok) throw new Error(`Binance API error: ${response.status}`)
+    
+    const data = await response.json()
+    return data.map((c: any[]) => ({
+      timestamp: c[0],
+      open: parseFloat(c[1]),
+      high: parseFloat(c[2]),
+      low: parseFloat(c[3]),
+      close: parseFloat(c[4]),
+      volume: parseFloat(c[5]),
+    }))
+  } catch (error) {
+    console.error(`[MarketData] Binance fallback failed for ${symbol}:`, error)
+    return []
   }
-
-  return candles
 }
 
 async function saveCandlesToRedis(client: any, symbol: string, candles: MarketDataCandle[], source: string): Promise<void> {
@@ -199,12 +219,12 @@ export async function loadMarketDataForEngine(symbols: string[] = []): Promise<n
         candles = await getCandlesFromBingX(symbol, timeframe, 250)
 
         if (candles.length === 0) {
-          const basePrice = basePrices[symbol] || 100
-          candles = generateSyntheticCandles(symbol, basePrice, 250)
-          console.log(`[v0] [MarketData] Synthetic candles for ${symbol}: ${candles.length}`)
+          // Fallback to Binance public API
+          candles = await getCandlesFromBinance(symbol, timeframe, 250)
+          console.log(`[v0] [MarketData] Binance fallback candles for ${symbol}: ${candles.length}`)
         }
 
-        const source = candles.length > 0 && candles[0].volume > 0 ? "bingx" : "synthetic"
+        const source = candles.length > 0 ? (candles[0].volume > 0 ? "bingx" : "binance") : "none"
         await saveCandlesToRedis(client, symbol, candles, source)
 
         loaded++
@@ -346,19 +366,13 @@ export async function updateMarketDataForSymbol(symbol: string, newCandles: Mark
 
       if (bingxCandles.length > 0) {
         marketData.candles = [...marketData.candles, ...bingxCandles].slice(-250)
-      } else if (marketData.candles.length > 0) {
-        const lastCandle = marketData.candles[marketData.candles.length - 1]
-        const newCandle: MarketDataCandle = {
-          timestamp: lastCandle.timestamp + 60000,
-          open: lastCandle.close,
-          close: lastCandle.close * (1 + (Math.random() - 0.5) * 0.01),
-          high: lastCandle.close * (1 + Math.random() * 0.005),
-          low: lastCandle.close * (1 - Math.random() * 0.005),
-          volume: Math.random() * 1000000,
+      } else {
+        // Try Binance fallback
+        const binanceCandles = await getCandlesFromBinance(symbol, timeframe, 1)
+        if (binanceCandles.length > 0) {
+          marketData.candles = [...marketData.candles, ...binanceCandles].slice(-250)
         }
-        newCandle.high = Math.max(newCandle.open, newCandle.close, newCandle.high)
-        newCandle.low = Math.min(newCandle.open, newCandle.close, newCandle.low)
-        marketData.candles.push(newCandle)
+        // If no new data available, keep existing candles (don't generate synthetic)
       }
     }
 
@@ -405,20 +419,8 @@ export async function loadHistoricalMarketData(
       return normalizeBingXCandles(candles)
     }
 
-    console.warn(`[v0] [MarketData] BingX returned no data, using synthetic for ${symbol}`)
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const candlesPerDay = timeframe === "1h" ? 24 : timeframe === "4h" ? 6 : 1
-    const totalCandles = daysDiff * candlesPerDay
-
-    const synthetic = generateSyntheticCandles(symbol, 100, totalCandles)
-    const startTimestamp = startDate.getTime()
-    const interval = timeframe === "1h" ? 3600000 : timeframe === "4h" ? 14400000 : 86400000
-
-    synthetic.forEach((candle, index) => {
-      candle.timestamp = startTimestamp + index * interval
-    })
-
-    return synthetic
+    console.warn(`[v0] [MarketData] BingX returned no data for ${symbol}, returning empty`)
+    return []
   } catch (error) {
     console.error("[v0] [MarketData] Failed to load historical data:", error)
     return []

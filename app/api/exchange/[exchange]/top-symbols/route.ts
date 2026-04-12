@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getTopSymbolsByVolume } from "@/lib/market-data-service"
 
 /**
  * GET /api/exchange/[exchange]/top-symbols
@@ -7,25 +8,18 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request, { params }: { params: { exchange: string } }) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = Number(searchParams.get("limit") || "3")
+    const limit = Number(searchParams.get("limit") || "10")
     const exchange = (params.exchange || "").toLowerCase()
 
     console.log(`[v0] [TopSymbols] Fetching top ${limit} symbols by volume for ${exchange}`)
 
-    // Default top symbols by 24h volume (cached list - in production would call exchange APIs)
-    const topSymbolsByExchange: Record<string, string[]> = {
-      bingx: ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
-      bybit: ["BTCUSDT", "ETHUSDT", "XRPUSDT"],
-      binance: ["BTCUSDT", "ETHUSDT", "ADAUSDT"],
-      okx: ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
-    }
-
-    const symbols = topSymbolsByExchange[exchange] || ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+    // Fetch real top symbols from exchange public APIs
+    const symbols = await getTopSymbolsByVolume(exchange, limit)
 
     return NextResponse.json({
       success: true,
       exchange,
-      symbols: symbols.slice(0, limit),
+      symbols,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
