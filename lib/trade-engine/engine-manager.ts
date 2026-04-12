@@ -207,6 +207,7 @@ export class TradeEngineManager {
    * Load prehistoric data (historical data before real-time processing)
    * Uses BingX API with real credentials from Redis connection settings
    * Respects timeframe from settings (marketTimeframe) and prehistoricDataDays
+   * Loads only missing time ranges and processes by interval of the specified timeframe
    */
   private async loadPrehistoricData(): Promise<void> {
     console.log("[v0] [Prehistoric] Starting background prehistoric data loading...")
@@ -226,10 +227,11 @@ export class TradeEngineManager {
       })
 
       const allSettings = (await getSettings("all_settings")) || {}
-      const days = allSettings.prehistoricDataDays || 5
-      const marketTimeframe = allSettings.marketTimeframe || 1
+      const days = allSettings.prehistoricDataDays || 1
+      const marketTimeframe = allSettings.marketTimeframe ?? 0
 
       const timeframeMap: Record<number, string> = {
+        0: "1s",
         1: "1m",
         2: "1m",
         3: "1m",
@@ -237,17 +239,31 @@ export class TradeEngineManager {
         10: "5m",
         15: "15m",
       }
-      const interval = timeframeMap[marketTimeframe] || "1m"
+      const interval = timeframeMap[marketTimeframe] || "1s"
+
+      const intervalMsMap: Record<string, number> = {
+        "1s": 1000,
+        "1m": 60000,
+        "5m": 300000,
+        "15m": 900000,
+      }
+      const intervalMs = intervalMsMap[interval] || 1000
 
       console.log(`[v0] [Prehistoric] Settings: days=${days}, marketTimeframe=${marketTimeframe}, interval=${interval}`)
 
-      await this.updateProgressionPhase("prehistoric_data", 15, `Loading ${days} days of ${interval} data from BingX...`)
+      await this.updateProgressionPhase("prehistoric_data", 15, `Loading ${days} day(s) of ${interval} data from BingX...`)
 
       const { loadPrehistoricMarketData } = await import("@/lib/market-data-loader")
       const result = await loadPrehistoricMarketData(symbols, this.connectionId)
 
       const prehistoricEnd = new Date()
       const prehistoricStart = new Date(prehistoricEnd.getTime() - days * 24 * 60 * 60 * 1000)
+
+      const totalCandlesExpected = Math.floor((prehistoricEnd.getTime() - prehistoricStart.getTime()) / intervalMs)
+      const totalCandlesLoaded = result.loaded * (totalCandlesExpected / symbols.length)
+
+      console.log(`[v0] [Prehistoric] Complete: ${result.loaded}/${result.total} symbols loaded (${days} day(s), ${interval})`)
+      console.log(`[v0] [Prehistoric] Expected candles per symbol: ~${totalCandlesExpected}, Total loaded: ~${totalCandlesLoaded}`)
 
       await setSettings(`trade_engine_state:${this.connectionId}`, {
         prehistoric_data_loaded: true,
@@ -258,17 +274,154 @@ export class TradeEngineManager {
         prehistoric_days: days,
         prehistoric_symbols_loaded: result.loaded,
         prehistoric_symbols_total: result.total,
+        prehistoric_total_candles_expected: totalCandlesExpected,
+        prehistoric_total_candles_loaded: totalCandlesLoaded,
+        prehistoric_processing_complete: true,
         updated_at: new Date().toISOString(),
       })
-
-      console.log(`[v0] [Prehistoric] Complete: ${result.loaded}/${result.total} symbols loaded (${days} days, ${interval})`)
 
       await logProgressionEvent(this.connectionId, "prehistoric_complete", "info", "Prehistoric data loading complete", {
         symbolsLoaded: result.loaded,
         symbolsTotal: result.total,
         days,
         interval,
+        totalCandlesExpected,
+        totalCandlesLoaded,
+        processingComplete: true,
       })
+
+      await this.updateProgressionPhase("prehistoric_indications", 25, `Processing indications for ${symbols.length} symbols...`)
+
+      const { IndicationProcessor } = await import("./indication-processor")
+      const indicationProcessor = new IndicationProcessor(this.connectionId)
+
+      let totalIndicationsProcessed = 0
+      let totalStrategiesEvaluated = 0
+      const allDirectionStats: any[] = []
+      const allMoveStats: any[] = []
+      const allActiveStats: any[] = []
+      const allOptimalStats: any[] = []
+      let totalProfitFactor = 0
+      let totalQualified = 0
+      let totalCalculated = 0
+
+      for (let i = 0; i < symbols.length; i++) {
+        const symbol = symbols[i]
+        try {
+          await this.updateProgressionPhase("prehistoric_indications", 25 + Math.floor((i / symbols.length) * 50), `Processing ${symbol} (${i + 1}/${symbols.length})...`, {
+            current: i + 1,
+            total: symbols.length,
+            item: symbol,
+          })
+
+          await indicationProcessor.processHistoricalIndications(symbol, prehistoricStart, prehistoricEnd)
+
+          totalIndicationsProcessed++
+
+          try {
+            const { IndicationSetsProcessor } = await import("@/lib/indication-sets-processor")
+            const setsProcessor = new IndicationSetsProcessor(this.connectionId)
+
+            const directionStats = await setsProcessor.getSetStats(symbol, "direction")
+            const moveStats = await setsProcessor.getSetStats(symbol, "move")
+            const activeStats = await setsProcessor.getSetStats(symbol, "active")
+            const optimalStats = await setsProcessor.getSetStats(symbol, "optimal")
+
+            if (directionStats) allDirectionStats.push(directionStats)
+            if (moveStats) allMoveStats.push(moveStats)
+            if (activeStats) allActiveStats.push(activeStats)
+            if (optimalStats) allOptimalStats.push(optimalStats)
+
+            const avgProfitFactor = [directionStats, moveStats, activeStats, optimalStats]
+              .filter(s => s?.avgProfitFactor)
+              .reduce((sum, s) => sum + s.avgProfitFactor, 0) / 4
+
+            const sumQualified = [directionStats, moveStats, activeStats, optimalStats]
+              .filter(s => s?.totalQualified)
+              .reduce((sum, s) => sum + s.totalQualified, 0)
+
+            const sumCalculated = [directionStats, moveStats, activeStats, optimalStats]
+              .filter(s => s?.totalCalculated)
+              .reduce((sum, s) => sum + s.totalCalculated, 0)
+
+            totalProfitFactor += avgProfitFactor || 0
+            totalQualified += sumQualified || 0
+            totalCalculated += sumCalculated || 0
+
+            const directionEntries = directionStats?.currentEntries || 0
+            const moveEntries = moveStats?.currentEntries || 0
+            const activeEntries = activeStats?.currentEntries || 0
+            const optimalEntries = optimalStats?.currentEntries || 0
+
+            console.log(`[v0] [Prehistoric] ${symbol} | Direction: ${directionEntries}/250 | Move: ${moveEntries}/250 | Active: ${activeEntries}/250 | Optimal: ${optimalEntries}/250`)
+            console.log(`[v0] [Prehistoric] ${symbol} | Avg Profit Factor: ${avgProfitFactor?.toFixed(3) || 'N/A'} | Total Qualified: ${sumQualified} | Total Calculated: ${sumCalculated}`)
+
+            await logProgressionEvent(this.connectionId, "prehistoric_symbol_complete", "info", `Processed ${symbol}`, {
+              symbol,
+              direction: directionStats,
+              move: moveStats,
+              active: activeStats,
+              optimal: optimalStats,
+              avgProfitFactor,
+              totalQualified: sumQualified,
+              totalCalculated: sumCalculated,
+            })
+          } catch (statsErr) {
+            console.warn(`[v0] [Prehistoric] Failed to get stats for ${symbol}:`, statsErr)
+          }
+        } catch (err) {
+          console.error(`[v0] [Prehistoric] Failed to process ${symbol}:`, err)
+          await logProgressionEvent(this.connectionId, "prehistoric_symbol_error", "error", `Failed ${symbol}`, {
+            symbol,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      const avgProfitFactorAll = totalIndicationsProcessed > 0 ? totalProfitFactor / totalIndicationsProcessed : 0
+      const avgQualifiedPerSymbol = totalIndicationsProcessed > 0 ? totalQualified / totalIndicationsProcessed : 0
+      const avgCalculatedPerSymbol = totalIndicationsProcessed > 0 ? totalCalculated / totalIndicationsProcessed : 0
+
+      console.log(`[v0] [Prehistoric] === SUMMARY ===`)
+      console.log(`[v0] [Prehistoric] Symbols processed: ${totalIndicationsProcessed}/${symbols.length}`)
+      console.log(`[v0] [Prehistoric] Avg Profit Factor: ${avgProfitFactorAll.toFixed(3)}`)
+      console.log(`[v0] [Prehistoric] Avg Qualified per Symbol: ${avgQualifiedPerSymbol.toFixed(0)}`)
+      console.log(`[v0] [Prehistoric] Avg Calculated per Symbol: ${avgCalculatedPerSymbol.toFixed(0)}`)
+
+      await setSettings(`trade_engine_state:${this.connectionId}`, {
+        prehistoric_data_loaded: true,
+        prehistoric_data_start: prehistoricStart.toISOString(),
+        prehistoric_data_end: prehistoricEnd.toISOString(),
+        prehistoric_symbols: symbols,
+        prehistoric_interval: interval,
+        prehistoric_days: days,
+        prehistoric_symbols_loaded: result.loaded,
+        prehistoric_symbols_total: result.total,
+        prehistoric_total_candles_expected: totalCandlesExpected,
+        prehistoric_total_candles_loaded: totalCandlesLoaded,
+        prehistoric_processing_complete: true,
+        prehistoric_indications_processed: totalIndicationsProcessed,
+        prehistoric_avg_profit_factor: avgProfitFactorAll,
+        prehistoric_avg_qualified_per_symbol: avgQualifiedPerSymbol,
+        prehistoric_avg_calculated_per_symbol: avgCalculatedPerSymbol,
+        prehistoric_direction_stats: allDirectionStats,
+        prehistoric_move_stats: allMoveStats,
+        prehistoric_active_stats: allActiveStats,
+        prehistoric_optimal_stats: allOptimalStats,
+        updated_at: new Date().toISOString(),
+      })
+
+      await logProgressionEvent(this.connectionId, "prehistoric_all_complete", "info", "All prehistoric processing complete", {
+        symbolsProcessed: totalIndicationsProcessed,
+        symbolsTotal: symbols.length,
+        avgProfitFactor: avgProfitFactorAll,
+        avgQualifiedPerSymbol: avgQualifiedPerSymbol,
+        avgCalculatedPerSymbol: avgCalculatedPerSymbol,
+        processingComplete: true,
+      })
+
+      await this.updateProgressionPhase("prehistoric_complete", 40, `Prehistoric processing complete - ${totalIndicationsProcessed}/${symbols.length} symbols`)
+
     } catch (error) {
       console.warn("[v0] [Prehistoric] Background loading failed (non-fatal):", error instanceof Error ? error.message : String(error))
       await logProgressionEvent(this.connectionId, "prehistoric_error", "error", "Prehistoric data loading failed", {

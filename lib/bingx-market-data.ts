@@ -471,10 +471,11 @@ export async function getTimeframeFromSettings(): Promise<string> {
   try {
     await initRedis()
     const settings = (await getSettings("all_settings")) || {}
-    const marketTimeframe = settings.marketTimeframe || 1
-    const prehistoricDataDays = settings.prehistoricDataDays || 5
+    const marketTimeframe = settings.marketTimeframe ?? 0
+    const prehistoricDataDays = settings.prehistoricDataDays || 1
 
     const timeframeMap: Record<number, string> = {
+      0: "1s",
       1: "1m",
       2: "1m",
       3: "1m",
@@ -483,8 +484,8 @@ export async function getTimeframeFromSettings(): Promise<string> {
       15: "15m",
     }
 
-    return timeframeMap[marketTimeframe] || "1m"
+    return timeframeMap[marketTimeframe] || "1s"
   } catch {
-    return "1m"
+    return "1s"
   }
 }

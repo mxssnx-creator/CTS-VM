@@ -252,10 +252,11 @@ export async function loadPrehistoricMarketData(
     const client = getClient()
 
     const settings = (await getSettings("all_settings")) || {}
-    const days = settings.prehistoricDataDays || 5
-    const marketTimeframe = settings.marketTimeframe || 1
+    const days = settings.prehistoricDataDays || 1
+    const marketTimeframe = settings.marketTimeframe ?? 0
 
     const timeframeMap: Record<number, string> = {
+      0: "1s",
       1: "1m",
       2: "1m",
       3: "1m",
@@ -263,7 +264,15 @@ export async function loadPrehistoricMarketData(
       10: "5m",
       15: "15m",
     }
-    const interval = timeframeMap[marketTimeframe] || "1m"
+    const interval = timeframeMap[marketTimeframe] || "1s"
+
+    const intervalMsMap: Record<string, number> = {
+      "1s": 1000,
+      "1m": 60000,
+      "5m": 300000,
+      "15m": 900000,
+    }
+    const intervalMs = intervalMsMap[interval] || 1000
 
     const targetSymbols = symbols.length > 0 ? symbols : [
       "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
@@ -272,9 +281,11 @@ export async function loadPrehistoricMarketData(
     const endTime = Date.now()
     const startTime = endTime - days * 24 * 60 * 60 * 1000
 
-    console.log(`[v0] [PrehistoricMarketData] Loading ${days} days of data, interval=${interval}, symbols=${targetSymbols.length}`)
+    console.log(`[v0] [PrehistoricMarketData] Loading ${days} day(s) of data, interval=${interval}, symbols=${targetSymbols.length}`)
+    console.log(`[v0] [PrehistoricMarketData] Time range: ${new Date(startTime).toISOString()} to ${new Date(endTime).toISOString()}`)
 
     let loaded = 0
+    let totalCandlesLoaded = 0
 
     for (let i = 0; i < targetSymbols.length; i++) {
       const symbol = targetSymbols[i]
@@ -299,20 +310,79 @@ export async function loadPrehistoricMarketData(
           service.setConnectionId(connectionId)
         }
 
-        const candles = await service.fetchHistoricalKlines(bingxSymbol, interval, startTime, endTime)
+        // Check existing data to load only missing time ranges
+        const existingKey = `market_data:${symbol}:candles`
+        const existingData = await client.get(existingKey)
+        let existingCandles: any[] = []
+        let existingStartTime = startTime
+        let existingEndTime = endTime
 
-        if (candles.length > 0) {
-          const normalized = normalizeBingXCandles(candles)
-          await saveCandlesToRedis(client, symbol, normalized, "bingx_prehistoric")
+        if (existingData) {
+          try {
+            existingCandles = JSON.parse(existingData)
+            if (Array.isArray(existingCandles) && existingCandles.length > 0) {
+              const firstTs = existingCandles[0].timestamp
+              const lastTs = existingCandles[existingCandles.length - 1].timestamp
+
+              // Check if we need to fill gaps or extend range
+              if (firstTs > startTime) {
+                existingStartTime = firstTs
+                console.log(`[v0] [PrehistoricMarketData] ${symbol}: Loading missing range ${new Date(startTime).toISOString()} to ${new Date(firstTs).toISOString()}`)
+              }
+              if (lastTs < endTime - intervalMs) {
+                existingEndTime = lastTs
+                console.log(`[v0] [PrehistoricMarketData] ${symbol}: Loading missing range ${new Date(lastTs).toISOString()} to ${new Date(endTime).toISOString()}`)
+              }
+            }
+          } catch (parseErr) {
+            console.warn(`[v0] [PrehistoricMarketData] ${symbol}: Failed to parse existing data, loading full range`)
+          }
+        }
+
+        // Load only the missing time range
+        const loadStart = existingStartTime
+        const loadEnd = existingEndTime
+
+        // Process by intervals to avoid large requests
+        const allCandles: any[] = [...existingCandles]
+        let currentStart = loadStart
+
+        while (currentStart < loadEnd) {
+          const chunkEnd = Math.min(currentStart + (1000 * intervalMs), loadEnd)
+          const candles = await service.fetchHistoricalKlines(bingxSymbol, interval, currentStart, chunkEnd)
+
+          if (candles.length > 0) {
+            const normalized = normalizeBingXCandles(candles)
+            allCandles.push(...normalized)
+            totalCandlesLoaded += candles.length
+          }
+
+          currentStart = chunkEnd + intervalMs
+
+          if (candles.length === 0) break
+
+          await new Promise((r) => setTimeout(r, 100))
+        }
+
+        // Deduplicate and sort by timestamp
+        const uniqueCandles = allCandles
+          .filter((c, index, self) => index === self.findIndex((t) => t.timestamp === c.timestamp))
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .slice(-250)
+
+        if (uniqueCandles.length > 0) {
+          await saveCandlesToRedis(client, symbol, uniqueCandles, "bingx_prehistoric")
           loaded++
-          console.log(`[v0] [PrehistoricMarketData] [${i + 1}/${targetSymbols.length}] ${symbol}: ${normalized.length} candles loaded`)
+          console.log(`[v0] [PrehistoricMarketData] [${i + 1}/${targetSymbols.length}] ${symbol}: ${uniqueCandles.length} candles (loaded ${totalCandlesLoaded} new)`)
 
           if (connectionId) {
             await logProgressionEvent(connectionId, "prehistoric_market_data", "info", `Loaded ${symbol}`, {
               symbol,
-              candlesCount: normalized.length,
+              candlesCount: uniqueCandles.length,
+              newCandlesLoaded: totalCandlesLoaded,
               days,
               interval,
+              timeRange: `${new Date(startTime).toISOString()} to ${new Date(endTime).toISOString()}`,
             })
           }
         } else {
@@ -333,7 +403,7 @@ export async function loadPrehistoricMarketData(
       }
     }
 
-    console.log(`[v0] [PrehistoricMarketData] ✅ Complete: ${loaded}/${targetSymbols.length} symbols`)
+    console.log(`[v0] [PrehistoricMarketData] ✅ Complete: ${loaded}/${targetSymbols.length} symbols, ${totalCandlesLoaded} total candles loaded`)
     return { total: targetSymbols.length, loaded }
   } catch (error) {
     console.error("[v0] [PrehistoricMarketData] Failed:", error)
